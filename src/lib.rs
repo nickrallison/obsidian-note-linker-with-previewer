@@ -1,6 +1,8 @@
 #![allow(unused)] // for beginning only
 
 mod obsidian;
+use std::{io::Result, result};
+
 use js_sys::JsString;
 use wasm_bindgen::prelude::*;
 
@@ -45,39 +47,10 @@ impl ExampleCommand {
 }
 
 #[wasm_bindgen]
-pub struct ParseCommand {
-    id: JsString,
-    name: JsString,
-    files: Vec<obsidian::TFile>,
-}
-
-#[wasm_bindgen]
-impl ParseCommand {
-    #[wasm_bindgen(getter)]
-    pub fn id(&self) -> JsString {
-        self.id.clone()
-    }
-
-    #[wasm_bindgen(setter)]
-    pub fn set_id(&mut self, id: &str) {
-        self.id = JsString::from(id)
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn name(&self) -> JsString {
-        self.name.clone()
-    }
-
-    #[wasm_bindgen(setter)]
-    pub fn set_name(&mut self, name: &str) {
-        self.name = JsString::from(name)
-    }
-
-    pub fn callback(&self) {
-        let len_files = self.files.len();
-        let text: String = format!("Number of files: {}", len_files);
-        obsidian::Notice::new(&text);
-    }
+pub fn parse_files_to_str(vault: &obsidian::Vault) -> JsString {
+    let files = vault.getFiles();
+    let len_files = files.len();
+    JsString::from(format!("Number of files: {}", len_files))
 }
 
 #[wasm_bindgen]
@@ -86,12 +59,46 @@ pub fn onload(plugin: &obsidian::Plugin) {
         id: JsString::from("example"),
         name: JsString::from("Example"),
     };
-    plugin.addCommand(JsValue::from(cmd));
-
-    let cmd = ParseCommand {
-        id: JsString::from("parse"),
-        name: JsString::from("Parse"),
-        files: plugin.getFiles(),
-    };
-    plugin.addCommand(JsValue::from(cmd));
+    // plugin.addCommand(JsValue::from(cmd));
 }
+
+#[wasm_bindgen]
+struct ExampleStruct {
+    id: String,
+}
+
+#[wasm_bindgen]
+impl ExampleStruct {
+    #[wasm_bindgen(constructor)]
+    pub fn new(id: JsString) -> ExampleStruct {
+        ExampleStruct {
+            id: id.as_string().unwrap(),
+        }
+    }
+    #[wasm_bindgen(getter)]
+    pub fn id(&self) -> JsString {
+        self.id.clone().into()
+    }
+    #[wasm_bindgen(setter)]
+    pub fn set_id(&mut self, id: JsString) {
+        self.id = id.as_string().unwrap();
+    }
+    #[wasm_bindgen]
+    pub fn do_thing(&self) -> JsString {
+        let mut temp = self.id.clone();
+        temp.push_str(" is the id");
+        temp.into()
+    }
+}
+
+// use wasm_bindgen::prelude::*;
+
+// #[wasm_bindgen]
+// extern "C" {
+//     fn alert(s: &str);
+// }
+
+// #[wasm_bindgen]
+// pub fn greet_rust(name: &str) {
+//     alert(&format!("Hello, {}!", name));
+// }
