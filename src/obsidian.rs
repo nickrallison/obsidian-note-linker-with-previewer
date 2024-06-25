@@ -11,4 +11,9 @@ extern "C" {
 
     #[wasm_bindgen(constructor)]
     pub fn new(message: &str) -> Notice;
+
+    pub type TFile;
+
+    #[wasm_bindgen(method)]
+    pub fn getFiles(plugin: &Plugin) -> Vec<TFile>;
 }

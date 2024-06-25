@@ -7,6 +7,7 @@ use wasm_bindgen::prelude::*;
 use crate::prelude::*;
 
 mod error;
+mod parser;
 mod prelude;
 mod utils;
 
@@ -47,6 +48,7 @@ impl ExampleCommand {
 pub struct ParseCommand {
     id: JsString,
     name: JsString,
+    files: Vec<obsidian::TFile>,
 }
 
 #[wasm_bindgen]
@@ -72,7 +74,9 @@ impl ParseCommand {
     }
 
     pub fn callback(&self) {
-        obsidian::Notice::new("hello from parse 1");
+        let len_files = self.files.len();
+        let text: String = format!("Number of files: {}", len_files);
+        obsidian::Notice::new(&text);
     }
 }
 
@@ -87,6 +91,7 @@ pub fn onload(plugin: &obsidian::Plugin) {
     let cmd = ParseCommand {
         id: JsString::from("parse"),
         name: JsString::from("Parse"),
+        files: plugin.getFiles(),
     };
     plugin.addCommand(JsValue::from(cmd));
 }
