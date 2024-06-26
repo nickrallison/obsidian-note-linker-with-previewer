@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, Vault } from 'obsidian';
 
 import rustPlugin from "./pkg/obsidian_linker_plugin_bg.wasm";
 import * as plugin from "./pkg/obsidian_linker_plugin.js";
@@ -55,7 +55,12 @@ class ParseModal extends Modal {
 
 	onOpen() {
 		const { contentEl } = this;
-		let res = plugin.parse_files_to_str(this.app.vault);
+		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
+		let filewrappers: TFileWrapper[] = [];
+		filelist.forEach(file => {
+			filewrappers.push(new TFileWrapper(file));
+		});
+		let res = plugin.parse_files_to_str(vault, filelist);
 		let example_struct = new plugin.ExampleStruct("test");
 		res = res + ", " + example_struct.do_thing();
 		contentEl.setText(res);
@@ -93,5 +98,45 @@ class RustPluginSettingTab extends PluginSettingTab {
 					this.plugin.settings.mySetting = value;
 					await this.plugin.saveSettings();
 				}));
+	}
+}
+
+class TFileWrapper {
+	contents: string;
+	path: string;
+	name: string;
+
+	constructor(file: TFile) {
+		this.initialize(file);
+	}
+
+	async initialize(file: TFile) {
+		this.contents = await file.vault.cachedRead(file);
+		this.path = file.path;
+		this.name = file.name;
+	}
+
+	get_name() {
+		return this.name;
+	}
+
+	get_path() {
+		return this.path;
+	}
+
+	get_contents() {
+		return this.contents;
+	}
+
+	set_name(name: string) {
+		this.name = name;
+	}
+
+	set_path(path: string) {
+		this.path = path;
+	}
+
+	set_contents(contents: string) {
+		this.contents = contents;
 	}
 }

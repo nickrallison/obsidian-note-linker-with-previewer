@@ -17,6 +17,7 @@ mod utils;
 pub struct ExampleCommand {
     id: JsString,
     name: JsString,
+    vault: obsidian::Vault,
 }
 
 #[wasm_bindgen]
@@ -42,23 +43,32 @@ impl ExampleCommand {
     }
 
     pub fn callback(&self) {
-        obsidian::Notice::new("hello from rust");
+        let num_files = &self.vault.getFiles().len();
+        let message = format!("Number of files: {}", num_files);
+        obsidian::Notice::new(&message);
     }
 }
 
 #[wasm_bindgen]
-pub fn parse_files_to_str(vault: &obsidian::Vault) -> JsString {
-    let files = vault.getFiles();
-    let len_files = files.len();
-    JsString::from(format!("Number of files: {}", len_files))
+pub fn parse_files_to_str(vault: obsidian::Vault, filelist: Vec<obsidian::TFile>) -> JsString {
+    for file in filelist.iter() {
+        let content: JsValue = vault.cachedRead(file);
+        let content: String = content.as_string().unwrap();
+        let parsed: parser::MDFile = parser::parse_md_file_wrapper(content);
+        let status: String = format!("Parsed file: {}", file.path);
+        console_log_str(&status);
+    }
+
+    JsString::from(format!("Number of files: {}", filelist.len()))
 }
 
 #[wasm_bindgen]
 pub fn onload(plugin: &obsidian::Plugin) {
-    let cmd = ExampleCommand {
-        id: JsString::from("example"),
-        name: JsString::from("Example"),
-    };
+    // let cmd = ExampleCommand {
+    //     id: JsString::from("example"),
+    //     name: JsString::from("Example"),
+    //     vault: plugin.get_app().get_vault(),
+    // };
     // plugin.addCommand(JsValue::from(cmd));
 }
 
