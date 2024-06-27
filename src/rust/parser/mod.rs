@@ -1,5 +1,8 @@
 use core::panic;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    vec,
+};
 
 use pest::Parser;
 use pest_derive::Parser;
@@ -155,6 +158,16 @@ impl MDFile {
             .collect();
         Ok(aliases)
     }
+
+    pub fn get_string_nodes(&self) -> Vec<StringPosition> {
+        let mut nodes: Vec<StringPosition> = Vec::new();
+        for block in &self.blocks {
+            for node in block.get_string_nodes() {
+                nodes.push(node);
+            }
+        }
+        nodes
+    }
 }
 
 fn parse_md_file(pairs: pest::iterators::Pair<Rule>, path: &Path) -> Result<MDFile> {
@@ -187,8 +200,8 @@ fn parse_md_file(pairs: pest::iterators::Pair<Rule>, path: &Path) -> Result<MDFi
 
 #[derive(Debug)]
 
-struct YAML {
-    yaml: serde_yaml::Value,
+pub struct YAML {
+    pub yaml: serde_yaml::Value,
 }
 
 fn parse_yaml(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<YAML> {
@@ -216,11 +229,36 @@ fn parse_yaml(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<YAML> {
 }
 
 #[derive(Debug)]
-enum Block {
+pub enum Block {
     BlockQuote(BlockQuote),
     Latex(LatexBlock),
     Code(CodeBlock),
     String(StringBlock),
+}
+
+impl Block {
+    pub fn get_string_nodes(&self) -> Vec<StringPosition> {
+        let mut nodes: Vec<StringPosition> = Vec::new();
+        match self {
+            Block::BlockQuote(block_quote) => {
+                for block in &block_quote.inner_blocks {
+                    for node in block.get_string_nodes() {
+                        nodes.push(node);
+                    }
+                }
+            }
+            Block::Latex(latex_block) => {}
+            Block::Code(code_block) => {}
+            Block::String(string_block) => {
+                for line in &string_block.lines {
+                    for node in &line.get_string_nodes() {
+                        nodes.push(node.clone());
+                    }
+                }
+            }
+        }
+        nodes
+    }
 }
 
 fn parse_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Block> {
@@ -282,8 +320,8 @@ fn parse_vec_line_into_block(
 
 // not including >
 #[derive(Debug)]
-struct BlockQuote {
-    inner_blocks: Vec<Block>,
+pub struct BlockQuote {
+    pub inner_blocks: Vec<Block>,
 }
 
 fn parse_block_quote_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<BlockQuote> {
@@ -404,8 +442,8 @@ fn parse_vec_line(pairs: Vec<pest::iterators::Pair<Rule>>, path: &Path) -> Resul
 
 // not including $$
 #[derive(Debug)]
-struct LatexBlock {
-    latex: String,
+pub struct LatexBlock {
+    pub latex: String,
 }
 
 fn parse_latex_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<LatexBlock> {
@@ -420,9 +458,9 @@ fn parse_latex_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<L
 
 // not including ```
 #[derive(Debug)]
-struct CodeBlock {
-    code_type: Option<String>,
-    code: String,
+pub struct CodeBlock {
+    pub code_type: Option<String>,
+    pub code: String,
 }
 
 fn parse_code_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<CodeBlock> {
@@ -452,8 +490,8 @@ fn parse_code_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Co
 }
 #[derive(Debug)]
 
-struct StringBlock {
-    lines: Vec<Line>,
+pub struct StringBlock {
+    pub lines: Vec<Line>,
 }
 
 fn parse_string_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<StringBlock> {
@@ -479,11 +517,58 @@ fn parse_string_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
 }
 
 #[derive(Debug)]
-enum Line {
+pub enum Line {
     NumberedList(NumberedList),
     BulletedList(BulletedList),
     Heading(Heading),
     StringLine(StringLine),
+}
+
+impl Line {
+    pub fn get_string_nodes(&self) -> Vec<StringPosition> {
+        match self {
+            Line::NumberedList(numbered_list) => {
+                let mut nodes: Vec<StringPosition> = Vec::new();
+                for node in &numbered_list.nodes {
+                    let inner_nodes = node.get_string_node();
+                    for node in inner_nodes {
+                        nodes.push(node);
+                    }
+                }
+                nodes
+            }
+            Line::BulletedList(bulleted_list) => {
+                let mut nodes: Vec<StringPosition> = Vec::new();
+                for node in &bulleted_list.nodes {
+                    let inner_nodes = node.get_string_node();
+                    for node in inner_nodes {
+                        nodes.push(node);
+                    }
+                }
+                nodes
+            }
+            Line::Heading(heading) => {
+                let mut nodes: Vec<StringPosition> = Vec::new();
+                for node in &heading.nodes {
+                    let inner_nodes = node.get_string_node();
+                    for node in inner_nodes {
+                        nodes.push(node);
+                    }
+                }
+                nodes
+            }
+            Line::StringLine(string_line) => {
+                let mut nodes: Vec<StringPosition> = Vec::new();
+                for node in &string_line.nodes {
+                    let inner_nodes = node.get_string_node();
+                    for node in inner_nodes {
+                        nodes.push(node);
+                    }
+                }
+                nodes
+            }
+        }
+    }
 }
 
 fn parse_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Line> {
@@ -519,10 +604,10 @@ fn parse_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Line> {
 
 #[derive(Debug)]
 
-struct NumberedList {
-    indent: String,
-    number: u32,
-    nodes: Vec<Node>,
+pub struct NumberedList {
+    pub indent: String,
+    pub number: u32,
+    pub nodes: Vec<Node>,
 }
 
 fn parse_numbered_list_line(
@@ -558,9 +643,9 @@ fn parse_numbered_list_line(
 
 #[derive(Debug)]
 
-struct BulletedList {
-    indent: String,
-    nodes: Vec<Node>,
+pub struct BulletedList {
+    pub indent: String,
+    pub nodes: Vec<Node>,
 }
 
 fn parse_list_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<BulletedList> {
@@ -588,9 +673,9 @@ fn parse_list_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Bul
 
 #[derive(Debug)]
 
-struct Heading {
-    level: u32,
-    nodes: Vec<Node>,
+pub struct Heading {
+    pub level: u32,
+    pub nodes: Vec<Node>,
 }
 
 fn parse_heading_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Heading> {
@@ -618,8 +703,8 @@ fn parse_heading_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
 
 #[derive(Debug)]
 
-struct StringLine {
-    nodes: Vec<Node>,
+pub struct StringLine {
+    pub nodes: Vec<Node>,
 }
 
 fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<StringLine> {
@@ -679,7 +764,7 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<S
 
 #[derive(Debug)]
 
-enum Node {
+pub enum Node {
     Text(String),
     BoldItalic(String),
     Bold(String),
@@ -694,11 +779,54 @@ enum Node {
     InlineLatexBlock(String),
 }
 
+impl Node {
+    pub fn get_string_node(&self) -> Vec<StringPosition> {
+        match self {
+            Node::Text(_) => {
+                vec![StringPosition {
+                    string_node: self,
+                    line: 0,
+                    column: 0,
+                }]
+            }
+            Node::BoldItalic(_) => {
+                vec![StringPosition {
+                    string_node: self,
+                    line: 0,
+                    column: 0,
+                }]
+            }
+            Node::Bold(_) => {
+                vec![StringPosition {
+                    string_node: self,
+                    line: 0,
+                    column: 0,
+                }]
+            }
+            Node::Italic(_) => {
+                vec![StringPosition {
+                    string_node: self,
+                    line: 0,
+                    column: 0,
+                }]
+            }
+            Node::MDLink(_) => vec![],
+            Node::NamedMDLink(_) => vec![],
+            Node::WebLink(_) => vec![],
+            Node::SquareBracket(_) => vec![],
+            Node::InlineCode(_) => vec![],
+            Node::InlineLatex(_) => vec![],
+            Node::InlineCodeBlock(_) => vec![],
+            Node::InlineLatexBlock(_) => vec![],
+        }
+    }
+}
+
 #[derive(Debug)]
 
-struct NamedMDLink {
-    name: String,
-    link: String,
+pub struct NamedMDLink {
+    pub name: String,
+    pub link: String,
 }
 
 fn parse_named_link_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<NamedMDLink> {
@@ -729,9 +857,9 @@ fn parse_named_link_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Resu
 
 #[derive(Debug)]
 
-struct WebLink {
-    name: String,
-    link: String,
+pub struct WebLink {
+    pub name: String,
+    pub link: String,
 }
 
 fn parse_weblink_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<WebLink> {
@@ -758,4 +886,10 @@ fn parse_weblink_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
     }
 
     Ok(WebLink { name, link })
+}
+
+struct StringPosition<'a> {
+    string_node: &'a Node,
+    line: usize,
+    column: usize,
 }

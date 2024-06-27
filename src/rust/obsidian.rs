@@ -35,10 +35,18 @@ extern "C" {
     pub fn getFiles(vault: &Vault) -> Vec<TFile>;
 
     pub type PrinterObject;
-    // #[wasm_bindgen(constructor)]
-    // pub fn new() -> PrinterObject;
+
     #[wasm_bindgen(method)]
     pub fn printer(this: &PrinterObject, s: &str);
-    // #[wasm_bindgen(method)]
-    // pub fn printer_func(s: &str);
+
+    pub type RustPluginSettings;
+    #[wasm_bindgen(method, setter)]
+    pub fn set_case_insensitive(this: &RustPluginSettings, case_insensitive: bool);
+    #[wasm_bindgen(method, setter)]
+    pub fn set_link_to_self(this: &RustPluginSettings, link_to_self: bool);
+    #[wasm_bindgen(method, getter)]
+    pub fn get_case_insensitive(this: &RustPluginSettings) -> bool;
+    #[wasm_bindgen(method, getter)]
+    pub fn get_link_to_self(this: &RustPluginSettings) -> bool;
+
 }

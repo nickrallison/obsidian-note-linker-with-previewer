@@ -348,6 +348,7 @@ dependencies = [
  "md_parser",
  "pest",
  "pest_derive",
+ "regex",
  "serde_yaml",
  "thiserror",
  "wasm-bindgen",

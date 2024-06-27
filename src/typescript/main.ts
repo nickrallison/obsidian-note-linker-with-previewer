@@ -6,13 +6,32 @@ import { prependListener } from 'process';
 
 // Remember to rename these classes and interfaces!
 
-interface RustPluginSettings {
-	mySetting: string;
+class RustPluginSettings {
+	caseInsensitive: boolean;
+	linkToSelf: boolean;
+
+	constructor(caseInsensitive: boolean, linkToSelf: boolean) {
+		this.caseInsensitive = caseInsensitive;
+		this.linkToSelf = linkToSelf;
+	}
+	set_case_insensitive(caseSensitive: boolean) {
+		this.caseInsensitive = caseSensitive;
+	}
+	set_link_to_self(linkToSelf: boolean) {
+		this.linkToSelf = linkToSelf;
+	}
+	get_case_insensitive() {
+		return this.caseInsensitive;
+	}
+	get_link_to_self() {
+		return this.linkToSelf;
+	}
+
 }
 
-const DEFAULT_SETTINGS: RustPluginSettings = {
-	mySetting: 'default'
-}
+const DEFAULT_SETTINGS: RustPluginSettings = new RustPluginSettings(true, false);
+
+
 
 export default class RustPlugin extends Plugin {
 	settings: RustPluginSettings;
@@ -28,7 +47,7 @@ export default class RustPlugin extends Plugin {
 			id: "parse",
 			name: "Parse",
 			callback: () => {
-				new ParseModal(this.app).open();
+				new ParseModal(this).open();
 			}
 		});
 	}
@@ -45,23 +64,26 @@ export default class RustPlugin extends Plugin {
 }
 
 class ParseModal extends Modal {
-	constructor(app: App) {
-		super(app);
+	plugin: RustPlugin;
+	constructor(plugin: RustPlugin) {
+		super(plugin.app);
+		this.plugin = plugin;
 	}
 
 	async onOpen() {
+
 		const { contentEl } = this;
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
 		let file_paths: string[] = filelist.map(file => file.path);
 		let file_contents: string[] = await Promise.all(filelist.map(async file => await this.app.vault.cachedRead(file)));
 		let linker_obj: plugin.JsLinker = new plugin.JsLinker(file_paths, file_contents);
 		let bad_parse_file_errors: string[] = linker_obj.get_bad_parse_files();
-
 		// for (let error of bad_parse_file_errors) {
 		// 	console.log(`${error}`);
 		// }
 
-		let links: plugin.JsLink[] = linker_obj.get_links();
+
+		let links: plugin.JsLink[] = linker_obj.get_links(this.plugin.settings.linker_serrings);
 
 		for (let link of links) {
 			console.log(`${link.debug()}`);
@@ -92,17 +114,18 @@ class RustPluginSettingTab extends PluginSettingTab {
 
 		containerEl.createEl('h2', { text: 'Settings for my awesome plugin.' });
 
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+
+		// new Setting(containerEl)
+		// 	.setName('Case Sensitive')
+		// 	.setDesc('Whether to use a case sensitive search whe linking files')
+		// 	.addText(text => text
+		// 		.setPlaceholder('Enter your secret')
+		// 		.setValue(this.plugin.settings.mySetting)
+		// 		.onChange(async (value) => {
+		// 			console.log('Secret: ' + value);
+		// 			this.plugin.settings.mySetting = value;
+		// 			await this.plugin.saveSettings();
+		// 		}));
 	}
 }
 

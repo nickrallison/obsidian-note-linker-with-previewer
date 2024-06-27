@@ -1,7 +1,5 @@
 #![allow(unused)] // for beginning only
 
-mod obsidian;
-
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -9,11 +7,13 @@ use std::{
 };
 
 use js_sys::JsString;
+use regex::{Regex, RegexBuilder};
 use wasm_bindgen::prelude::*;
 
 use crate::prelude::*;
 
 mod error;
+mod obsidian;
 mod parser;
 mod prelude;
 mod utils;
@@ -112,11 +112,11 @@ impl JsLinker {
         bad_files
     }
     #[wasm_bindgen]
-    pub fn get_links(&self) -> Vec<JsLink> {
+    pub fn get_links(&self, options: obsidian::RustPluginSettings) -> Vec<JsLink> {
         let mut links: Vec<JsLink> = vec![];
 
+        // constructing a list of aliases for constructing the replace regex
         let mut alias_map: HashMap<&Path, Vec<&str>> = HashMap::new();
-
         for file in &self.files {
             let mut aliases: Vec<&str> = vec![];
             match file {
@@ -138,8 +138,61 @@ impl JsLinker {
                 Err(_) => (),
             }
         }
+
+        // constructing the replace regex
+        // ((?:Elliptic Curve Cryptography)|(?:Elliptic Curve))|((?:identity element)|(?:identity))
+        // all of the aliases from a file are grouped together
+
+        // the regex group of each file is contained here
+        // for example the group index of Elliptic Curve Cryptography would be 0, ...
+        // ...and the group index of identity element would be 1
+
+        let mut file_groups: HashMap<&Path, u32> = HashMap::new();
+        for (path, aliases) in alias_map.iter() {
+            let mut group_index: u32 = 0;
+            file_groups.insert(path, group_index);
+        }
+
+        let mut file_regex_strs: Vec<String> = vec![];
+        for (path, aliases) in alias_map.iter() {
+            let mut file_regex_str: String = String::from("(");
+            for alias in aliases {
+                file_regex_str.push_str(&format!("(?:{})|", alias));
+            }
+            file_regex_str.pop();
+            file_regex_str.push(')');
+            file_regex_strs.push(file_regex_str);
+        }
+
+        let regex: String = file_regex_strs.join("|");
+        // if case_sensitive {
+
+        let regex: Regex = RegexBuilder::new(&regex)
+            .case_insensitive(options.get_case_insensitive())
+            .build()
+            .expect("Invalid Regex");
+
+        for file in &self.files {
+            match file {
+                Ok(md_file) => {
+                    let content: &str = md_file.get_content();
+                    let links: Vec<JsLink> = JsLinker::get_links_from_file(
+                        content,
+                        &regex,
+                        &alias_map,
+                        &file_groups,
+                        &md_file.path,
+                    );
+                    for link in links {
+                        links.push(link);
+                    }
+                }
+                Err(_) => (),
+            }
+        }
+
         let debug_link = JsLink {
-            debug_field: format!("{:?}", alias_map),
+            debug_field: format!("regex_p: {:?}", regex_p),
         };
         links.push(debug_link);
         links
