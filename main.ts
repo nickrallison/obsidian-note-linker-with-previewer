@@ -54,19 +54,22 @@ class ParseModal extends Modal {
 		super(app);
 	}
 
-	onOpen() {
+	async onOpen() {
 		const { contentEl } = this;
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
-		let filewrappers: TFileWrapper[] = [];
-		let printer_object = new PrinterObject();
-		filelist.forEach(file => {
-			let filewrappers: TFileWrapper[] = [];
-			filewrappers.push(new TFileWrapper(file));
-			console.log(file.path);
-			let res = plugin.parse_files_to_str(this.app.vault, filelist, printer_object);
+		let file_dict: { [key: string]: string } = {};
+		await filelist.forEach(async file => {
+			file_dict[file.path] = await this.app.vault.cachedRead(file);
 		});
-		let example_struct = new plugin.ExampleStruct("test");
-		let text = example_struct.do_thing();
+		// for path in dict.keys() do thing
+
+		for (let path in file_dict) {
+			console.log(path);
+			let res: string = plugin.parse_file_to_str(file_dict[path]);
+			console.log(res);
+		}
+
+		let text = 'Hi there!';
 		contentEl.setText(text);
 	}
 

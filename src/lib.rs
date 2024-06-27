@@ -1,7 +1,6 @@
 #![allow(unused)] // for beginning only
 
 mod obsidian;
-use std::{io::Result, result};
 
 use js_sys::JsString;
 use wasm_bindgen::prelude::*;
@@ -50,20 +49,14 @@ impl ExampleCommand {
 }
 
 #[wasm_bindgen]
-pub fn parse_files_to_str(
-    vault: obsidian::Vault,
-    filelist: Vec<obsidian::TFileWrapper>,
-    printer: obsidian::PrinterObject,
-) -> JsString {
-    for file in filelist.iter() {
-        let content: JsString = file.get_contents();
-        let content: String = content.as_string().unwrap();
-        printer.printer(&status);
-        let parsed: parser::MDFile = parser::parse_md_file_wrapper(content);
-        printer.printer(&status);
-    }
+pub fn parse_file_to_str(content: JsString) -> JsString {
+    let content: String = content.as_string().unwrap();
+    let parsed: Result<parser::MDFile> = parser::parse_md_file_wrapper(content);
 
-    JsString::from(format!("Number of files: {}", filelist.len()))
+    match parsed {
+        Ok(_) => JsString::from(format!("{:?}", parsed)),
+        Err(e) => JsString::from(format!("Error: {}", e)),
+    }
 }
 
 #[wasm_bindgen]
