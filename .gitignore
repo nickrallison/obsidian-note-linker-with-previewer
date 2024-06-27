@@ -23,3 +23,4 @@ data.json
 
 # Rust-specific results
 target/
+pkg/
