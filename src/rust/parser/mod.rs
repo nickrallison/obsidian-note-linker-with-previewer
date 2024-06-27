@@ -1,5 +1,5 @@
 use core::panic;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use pest::Parser;
 use pest_derive::Parser;
@@ -56,7 +56,8 @@ use crate::prelude::*;
 #[grammar = "src/rust/parser/md.pest"]
 pub struct MDParser;
 
-pub fn parse_md_file_wrapper(contents: String) -> Result<MDFile> {
+pub fn parse_md_file_wrapper(contents: String, path: String) -> Result<MDFile> {
+    let path = PathBuf::from(path);
     let mut contents = contents;
     if !&contents.ends_with('\n') {
         contents.push('\n');
@@ -65,28 +66,98 @@ pub fn parse_md_file_wrapper(contents: String) -> Result<MDFile> {
     let parse_result = MDParser::parse(Rule::md_file, &contents);
     let mut md_file = match parse_result {
         Ok(md_file) => md_file,
-        Err(e) => return Err(Error::Generic(format!("Error: {}", e))),
+        Err(e) => {
+            return Err(Error::ParseError(
+                path.to_path_buf(),
+                format!("Error: {}", e),
+            ))
+        }
     };
     let pairs_result = md_file.next();
     let pairs = match pairs_result {
         Some(pairs) => pairs,
-        None => return Err(Error::Generic(format!("No parse result"))),
+        None => {
+            return Err(Error::ParseError(
+                path.to_path_buf(),
+                format!("No parse result"),
+            ))
+        }
     };
 
-    let md_file_struct: MDFile = parse_md_file(pairs)?;
-
+    let mut md_file_struct: MDFile = parse_md_file(pairs, &path)?;
+    md_file_struct.path = path;
     Ok(md_file_struct)
 }
 
 #[derive(Debug)]
 pub struct MDFile {
-    yaml: Option<YAML>,
-    blocks: Vec<Block>,
+    pub yaml: Option<YAML>,
+    pub blocks: Vec<Block>,
 
-    path: PathBuf, // absolute path to the file
+    pub path: PathBuf, // absolute path to the file
 }
 
-fn parse_md_file(pairs: pest::iterators::Pair<Rule>) -> Result<MDFile> {
+impl MDFile {
+    pub fn get_yaml(&self) -> Option<&serde_yaml::Value> {
+        self.yaml.as_ref().map(|yaml| &yaml.yaml)
+    }
+
+    // pub fn get_blocks(&self) -> &Vec<Block> {
+    //     &self.blocks
+    // }
+
+    pub fn get_title(&self) -> &str {
+        // basename of the file
+        self.path.file_stem().unwrap().to_str().unwrap()
+    }
+
+    pub fn get_aliases(&self) -> Result<Vec<&str>> {
+        let yaml: &serde_yaml::Value = match self.yaml.as_ref() {
+            Some(yaml) => &yaml.yaml,
+            None => {
+                return Err(Error::Generic(format!(
+                    "No yaml for file: {}",
+                    self.path.display()
+                )))
+            }
+        };
+
+        let aliases: Option<&Vec<serde_yaml::Value>> = yaml["aliases"].as_sequence();
+        let aliases: &Vec<serde_yaml::Value> = match aliases {
+            Some(aliases) => aliases,
+            None => {
+                return Err(Error::Generic(format!(
+                    "No aliases for file: {}",
+                    self.path.display()
+                )))
+            }
+        };
+        for alias in aliases {
+            let alias: &serde_yaml::Value = alias;
+            let alias: &str = match alias.as_str() {
+                Some(alias) => alias,
+                None => {
+                    return Err(Error::Generic(format!(
+                        "Alias: {:?} is not a string for file: {}",
+                        alias,
+                        self.path.display()
+                    )))
+                }
+            };
+        }
+        let aliases: Vec<&str> = aliases
+            .iter()
+            .map(|alias| {
+                alias
+                    .as_str()
+                    .expect("Non strings should have been caught above")
+            })
+            .collect();
+        Ok(aliases)
+    }
+}
+
+fn parse_md_file(pairs: pest::iterators::Pair<Rule>, path: &Path) -> Result<MDFile> {
     debug_assert!(pairs.as_rule() == Rule::md_file);
     let mut result: MDFile = MDFile {
         yaml: None,
@@ -97,17 +168,17 @@ fn parse_md_file(pairs: pest::iterators::Pair<Rule>) -> Result<MDFile> {
     for pair in pairs.into_inner() {
         match pair.as_rule() {
             Rule::yaml => {
-                result.yaml = Some(parse_yaml(pair)?);
+                result.yaml = Some(parse_yaml(pair, &path)?);
             }
             Rule::block => {
-                result.blocks.push(parse_block(pair)?);
+                result.blocks.push(parse_block(pair, &path)?);
             }
             Rule::EOI => {}
             _ => {
-                return Err(Error::Generic(format!(
-                    "unexpected rule: {:?}",
-                    pair.as_rule()
-                )))
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair.as_rule()),
+                ))
             }
         }
     }
@@ -120,7 +191,7 @@ struct YAML {
     yaml: serde_yaml::Value,
 }
 
-fn parse_yaml(pair: pest::iterators::Pair<Rule>) -> Result<YAML> {
+fn parse_yaml(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<YAML> {
     debug_assert!(pair.as_rule() == Rule::yaml);
 
     for pair_inner in pair.into_inner() {
@@ -131,14 +202,17 @@ fn parse_yaml(pair: pest::iterators::Pair<Rule>) -> Result<YAML> {
                 });
             }
             _ => {
-                return Err(Error::Generic(format!(
-                    "unexpected rule: {:?}",
-                    pair_inner.as_rule()
-                )))
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner.as_rule()),
+                ))
             }
         }
     }
-    return Err(Error::Generic(format!("pairs inner is empty")));
+    return Err(Error::ParseError(
+        path.to_path_buf(),
+        format!("pairs inner is empty"),
+    ));
 }
 
 #[derive(Debug)]
@@ -149,35 +223,43 @@ enum Block {
     String(StringBlock),
 }
 
-fn parse_block(pair: pest::iterators::Pair<Rule>) -> Result<Block> {
+fn parse_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Block> {
     debug_assert!(pair.as_rule() == Rule::block || pair.as_rule() == Rule::yaml);
 
     for pair_inner in pair.into_inner() {
         match pair_inner.as_rule() {
             Rule::block_quote_block => {
-                return Ok(Block::BlockQuote(parse_block_quote_block(pair_inner)?));
+                return Ok(Block::BlockQuote(parse_block_quote_block(
+                    pair_inner, &path,
+                )?));
             }
             Rule::latex_block => {
-                return Ok(Block::Latex(parse_latex_block(pair_inner)?));
+                return Ok(Block::Latex(parse_latex_block(pair_inner, &path)?));
             }
             Rule::code_block => {
-                return Ok(Block::Code(parse_code_block(pair_inner)?));
+                return Ok(Block::Code(parse_code_block(pair_inner, &path)?));
             }
             Rule::string_block => {
-                return Ok(Block::String(parse_string_block(pair_inner)?));
+                return Ok(Block::String(parse_string_block(pair_inner, &path)?));
             }
             _ => {
-                return Err(Error::Generic(format!(
-                    "unexpected rule: {:?}",
-                    pair_inner.as_rule()
-                )))
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner.as_rule()),
+                ))
             }
         }
     }
-    return Err(Error::Generic(format!("pairs inner is empty")));
+    return Err(Error::ParseError(
+        path.to_path_buf(),
+        format!("pairs inner is empty"),
+    ));
 }
 
-fn parse_vec_line_into_block(pairs: Vec<pest::iterators::Pair<Rule>>) -> Result<StringBlock> {
+fn parse_vec_line_into_block(
+    pairs: Vec<pest::iterators::Pair<Rule>>,
+    path: &Path,
+) -> Result<StringBlock> {
     for pair in &pairs {
         debug_assert!(pair.as_rule() == Rule::block || pair.as_rule() == Rule::yaml);
     }
@@ -185,13 +267,13 @@ fn parse_vec_line_into_block(pairs: Vec<pest::iterators::Pair<Rule>>) -> Result<
     for pair in pairs {
         match pair.as_rule() {
             Rule::line => {
-                lines.push(parse_line(pair)?);
+                lines.push(parse_line(pair, &path)?);
             }
             _ => {
-                return Err(Error::Generic(format!(
-                    "unexpected rule: {:?}",
-                    pair.as_rule()
-                )))
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair.as_rule()),
+                ))
             }
         }
     }
@@ -204,12 +286,12 @@ struct BlockQuote {
     inner_blocks: Vec<Block>,
 }
 
-fn parse_block_quote_block(pair: pest::iterators::Pair<Rule>) -> Result<BlockQuote> {
+fn parse_block_quote_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<BlockQuote> {
     debug_assert!(pair.as_rule() == Rule::block_quote_block);
 
     let mut inner_blocks: Vec<Block> = Vec::new();
     let lines: Vec<pest::iterators::Pair<Rule>> = pair.into_inner().collect();
-    parse_block_quote_lines(lines);
+    parse_block_quote_lines(lines, &path);
 
     Ok(BlockQuote { inner_blocks })
 }
@@ -222,7 +304,10 @@ enum BlockQuoteLineState {
     BlockQuote,
 }
 
-fn parse_block_quote_lines(pairs: Vec<pest::iterators::Pair<Rule>>) -> Result<BlockQuote> {
+fn parse_block_quote_lines(
+    pairs: Vec<pest::iterators::Pair<Rule>>,
+    path: &Path,
+) -> Result<BlockQuote> {
     for pair in &pairs {
         debug_assert!(pair.as_rule() == Rule::block_quote_line);
     }
@@ -243,11 +328,16 @@ fn parse_block_quote_lines(pairs: Vec<pest::iterators::Pair<Rule>>) -> Result<Bl
                         current_block.push(pair_inner);
                         state = BlockQuoteLineState::Line;
                     }
-                    _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+                    _ => {
+                        return Err(Error::ParseError(
+                            path.to_path_buf(),
+                            format!("unexpected rule: {:?}", pair_inner),
+                        ))
+                    }
                 },
                 BlockQuoteLineState::Line => match pair_inner.as_rule() {
                     Rule::block_quote_line => {
-                        inner_blocks.push(Block::String(parse_vec_line(current_block)?));
+                        inner_blocks.push(Block::String(parse_vec_line(current_block, &path)?));
                         current_block = Vec::new();
                         current_block.push(pair_inner);
                         state = BlockQuoteLineState::BlockQuote;
@@ -255,20 +345,30 @@ fn parse_block_quote_lines(pairs: Vec<pest::iterators::Pair<Rule>>) -> Result<Bl
                     Rule::line => {
                         current_block.push(pair_inner);
                     }
-                    _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+                    _ => {
+                        return Err(Error::ParseError(
+                            path.to_path_buf(),
+                            format!("unexpected rule: {:?}", pair_inner),
+                        ))
+                    }
                 },
                 BlockQuoteLineState::BlockQuote => match pair_inner.as_rule() {
                     Rule::block_quote_line => {
                         current_block.push(pair_inner);
                     }
                     Rule::line => {
-                        let block_quote = parse_block_quote_lines(current_block)?;
+                        let block_quote = parse_block_quote_lines(current_block, &path)?;
                         inner_blocks.push(Block::BlockQuote(block_quote));
                         current_block = Vec::new();
                         current_block.push(pair_inner);
                         state = BlockQuoteLineState::Line;
                     }
-                    _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+                    _ => {
+                        return Err(Error::ParseError(
+                            path.to_path_buf(),
+                            format!("unexpected rule: {:?}", pair_inner),
+                        ))
+                    }
                 },
             }
         }
@@ -277,12 +377,12 @@ fn parse_block_quote_lines(pairs: Vec<pest::iterators::Pair<Rule>>) -> Result<Bl
         BlockQuoteLineState::Start => {}
         BlockQuoteLineState::Line => {
             if !current_block.is_empty() {
-                inner_blocks.push(Block::String(parse_vec_line(current_block)?));
+                inner_blocks.push(Block::String(parse_vec_line(current_block, &path)?));
             }
         }
         BlockQuoteLineState::BlockQuote => {
             if !current_block.is_empty() {
-                let block_quote = parse_block_quote_lines(current_block)?;
+                let block_quote = parse_block_quote_lines(current_block, &path)?;
                 inner_blocks.push(Block::BlockQuote(block_quote));
             }
         }
@@ -291,13 +391,13 @@ fn parse_block_quote_lines(pairs: Vec<pest::iterators::Pair<Rule>>) -> Result<Bl
     Ok(BlockQuote { inner_blocks })
 }
 
-fn parse_vec_line(pairs: Vec<pest::iterators::Pair<Rule>>) -> Result<StringBlock> {
+fn parse_vec_line(pairs: Vec<pest::iterators::Pair<Rule>>, path: &Path) -> Result<StringBlock> {
     for pair in &pairs {
         debug_assert!(pair.as_rule() == Rule::line);
     }
     let mut lines: Vec<Line> = Vec::new();
     for pair in pairs {
-        lines.push(parse_line(pair)?);
+        lines.push(parse_line(pair, &path)?);
     }
     Ok(StringBlock { lines })
 }
@@ -308,7 +408,7 @@ struct LatexBlock {
     latex: String,
 }
 
-fn parse_latex_block(pair: pest::iterators::Pair<Rule>) -> Result<LatexBlock> {
+fn parse_latex_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<LatexBlock> {
     debug_assert!(pair.as_rule() == Rule::latex_block);
 
     let latex = pair.as_str();
@@ -325,7 +425,7 @@ struct CodeBlock {
     code: String,
 }
 
-fn parse_code_block(pair: pest::iterators::Pair<Rule>) -> Result<CodeBlock> {
+fn parse_code_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<CodeBlock> {
     debug_assert!(pair.as_rule() == Rule::code_block);
 
     let mut code_type: Option<String> = None;
@@ -339,7 +439,12 @@ fn parse_code_block(pair: pest::iterators::Pair<Rule>) -> Result<CodeBlock> {
             Rule::code_block_inner => {
                 code = pair_inner.as_str().to_string();
             }
-            _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+            _ => {
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner),
+                ))
+            }
         }
     }
 
@@ -351,7 +456,7 @@ struct StringBlock {
     lines: Vec<Line>,
 }
 
-fn parse_string_block(pair: pest::iterators::Pair<Rule>) -> Result<StringBlock> {
+fn parse_string_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<StringBlock> {
     debug_assert!(pair.as_rule() == Rule::string_block);
 
     let mut lines: Vec<Line> = Vec::new();
@@ -359,9 +464,14 @@ fn parse_string_block(pair: pest::iterators::Pair<Rule>) -> Result<StringBlock> 
     for pair_inner in pair.into_inner() {
         match pair_inner.as_rule() {
             Rule::line => {
-                lines.push(parse_line(pair_inner)?);
+                lines.push(parse_line(pair_inner, &path)?);
             }
-            _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+            _ => {
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner),
+                ))
+            }
         }
     }
 
@@ -376,7 +486,7 @@ enum Line {
     StringLine(StringLine),
 }
 
-fn parse_line(pair: pest::iterators::Pair<Rule>) -> Result<Line> {
+fn parse_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Line> {
     debug_assert!(pair.as_rule() == Rule::line);
 
     let mut result: Line = Line::StringLine(StringLine { nodes: Vec::new() });
@@ -384,18 +494,23 @@ fn parse_line(pair: pest::iterators::Pair<Rule>) -> Result<Line> {
     for pair_inner in pair.into_inner() {
         match pair_inner.as_rule() {
             Rule::heading_line => {
-                result = Line::Heading(parse_heading_line(pair_inner)?);
+                result = Line::Heading(parse_heading_line(pair_inner, &path)?);
             }
             Rule::numbered_list_line => {
-                result = Line::NumberedList(parse_numbered_list_line(pair_inner)?);
+                result = Line::NumberedList(parse_numbered_list_line(pair_inner, &path)?);
             }
             Rule::list_line => {
-                result = Line::BulletedList(parse_list_line(pair_inner)?);
+                result = Line::BulletedList(parse_list_line(pair_inner, &path)?);
             }
             Rule::string_line => {
-                result = Line::StringLine(parse_string_line(pair_inner)?);
+                result = Line::StringLine(parse_string_line(pair_inner, &path)?);
             }
-            _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+            _ => {
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner),
+                ))
+            }
         }
     }
 
@@ -410,7 +525,10 @@ struct NumberedList {
     nodes: Vec<Node>,
 }
 
-fn parse_numbered_list_line(pair: pest::iterators::Pair<Rule>) -> Result<NumberedList> {
+fn parse_numbered_list_line(
+    pair: pest::iterators::Pair<Rule>,
+    path: &Path,
+) -> Result<NumberedList> {
     debug_assert!(pair.as_rule() == Rule::numbered_list_line);
 
     let mut indent: String = String::new();
@@ -420,9 +538,14 @@ fn parse_numbered_list_line(pair: pest::iterators::Pair<Rule>) -> Result<Numbere
     for pair_inner in pair.into_inner() {
         match pair_inner.as_rule() {
             Rule::string_line => {
-                nodes = parse_string_line(pair_inner)?.nodes;
+                nodes = parse_string_line(pair_inner, &path)?.nodes;
             }
-            _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+            _ => {
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner),
+                ))
+            }
         }
     }
 
@@ -440,7 +563,7 @@ struct BulletedList {
     nodes: Vec<Node>,
 }
 
-fn parse_list_line(pair: pest::iterators::Pair<Rule>) -> Result<BulletedList> {
+fn parse_list_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<BulletedList> {
     debug_assert!(pair.as_rule() == Rule::list_line);
 
     let mut indent: String = String::new();
@@ -449,9 +572,14 @@ fn parse_list_line(pair: pest::iterators::Pair<Rule>) -> Result<BulletedList> {
     for pair_inner in pair.into_inner() {
         match pair_inner.as_rule() {
             Rule::string_line => {
-                nodes = parse_string_line(pair_inner)?.nodes;
+                nodes = parse_string_line(pair_inner, &path)?.nodes;
             }
-            _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+            _ => {
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner),
+                ))
+            }
         }
     }
 
@@ -465,7 +593,7 @@ struct Heading {
     nodes: Vec<Node>,
 }
 
-fn parse_heading_line(pair: pest::iterators::Pair<Rule>) -> Result<Heading> {
+fn parse_heading_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Heading> {
     debug_assert!(pair.as_rule() == Rule::heading_line);
 
     let mut level: u32 = 0;
@@ -474,9 +602,14 @@ fn parse_heading_line(pair: pest::iterators::Pair<Rule>) -> Result<Heading> {
     for pair_inner in pair.into_inner() {
         match pair_inner.as_rule() {
             Rule::string_line => {
-                nodes = parse_string_line(pair_inner)?.nodes;
+                nodes = parse_string_line(pair_inner, &path)?.nodes;
             }
-            _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+            _ => {
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner),
+                ))
+            }
         }
     }
 
@@ -489,7 +622,7 @@ struct StringLine {
     nodes: Vec<Node>,
 }
 
-fn parse_string_line(pair: pest::iterators::Pair<Rule>) -> Result<StringLine> {
+fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<StringLine> {
     debug_assert!(pair.as_rule() == Rule::string_line);
 
     let mut nodes: Vec<Node> = Vec::new();
@@ -506,13 +639,13 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>) -> Result<StringLine> {
                 nodes.push(Node::Italic(pair_inner.as_str().to_string()));
             }
             Rule::named_link_node => {
-                nodes.push(Node::NamedMDLink(parse_named_link_node(pair_inner)?));
+                nodes.push(Node::NamedMDLink(parse_named_link_node(pair_inner, &path)?));
             }
             Rule::link_node => {
                 nodes.push(Node::MDLink(pair_inner.as_str().to_string()));
             }
             Rule::weblink_node => {
-                nodes.push(Node::WebLink(parse_weblink_node(pair_inner)?));
+                nodes.push(Node::WebLink(parse_weblink_node(pair_inner, &path)?));
             }
             Rule::square_bracket_node => {
                 nodes.push(Node::SquareBracket(pair_inner.as_str().to_string()));
@@ -533,10 +666,10 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>) -> Result<StringLine> {
                 nodes.push(Node::Text(pair_inner.as_str().to_string()));
             }
             _ => {
-                return Err(Error::Generic(format!(
-                    "unexpected rule: {:?}",
-                    pair_inner.as_rule()
-                )))
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner.as_rule()),
+                ))
             }
         }
     }
@@ -568,7 +701,7 @@ struct NamedMDLink {
     link: String,
 }
 
-fn parse_named_link_node(pair: pest::iterators::Pair<Rule>) -> Result<NamedMDLink> {
+fn parse_named_link_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<NamedMDLink> {
     debug_assert!(pair.as_rule() == Rule::named_link_node);
 
     let mut name: String = String::new();
@@ -582,7 +715,12 @@ fn parse_named_link_node(pair: pest::iterators::Pair<Rule>) -> Result<NamedMDLin
             Rule::node => {
                 name = pair_inner.as_str().to_string();
             }
-            _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+            _ => {
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner),
+                ))
+            }
         }
     }
 
@@ -596,7 +734,7 @@ struct WebLink {
     link: String,
 }
 
-fn parse_weblink_node(pair: pest::iterators::Pair<Rule>) -> Result<WebLink> {
+fn parse_weblink_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<WebLink> {
     debug_assert!(pair.as_rule() == Rule::weblink_node);
 
     let mut name: String = String::new();
@@ -610,7 +748,12 @@ fn parse_weblink_node(pair: pest::iterators::Pair<Rule>) -> Result<WebLink> {
             Rule::weblink_link => {
                 link = pair_inner.as_str().to_string();
             }
-            _ => return Err(Error::Generic(format!("unexpected rule: {:?}", pair_inner))),
+            _ => {
+                return Err(Error::ParseError(
+                    path.to_path_buf(),
+                    format!("unexpected rule: {:?}", pair_inner),
+                ))
+            }
         }
     }
 

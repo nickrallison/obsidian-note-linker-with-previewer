@@ -2,6 +2,12 @@
 
 mod obsidian;
 
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    vec,
+};
+
 use js_sys::JsString;
 use wasm_bindgen::prelude::*;
 
@@ -48,16 +54,16 @@ impl ExampleCommand {
     }
 }
 
-#[wasm_bindgen]
-pub fn parse_file_to_str(content: JsString) -> JsString {
-    let content: String = content.as_string().unwrap();
-    let parsed: Result<parser::MDFile> = parser::parse_md_file_wrapper(content);
+// #[wasm_bindgen]
+// pub fn parse_file_to_str(content: JsString) -> JsString {
+//     let content: String = content.as_string().unwrap();
+//     let parsed: Result<parser::MDFile> = parser::parse_md_file_wrapper(content);
 
-    match parsed {
-        Ok(_) => JsString::from(format!("{:?}", parsed)),
-        Err(e) => JsString::from(format!("Error: {}", e)),
-    }
-}
+//     match parsed {
+//         Ok(_) => JsString::from(format!("{:?}", parsed)),
+//         Err(e) => JsString::from(format!("Error: {}", e)),
+//     }
+// }
 
 #[wasm_bindgen]
 pub fn onload(plugin: &obsidian::Plugin) {
@@ -70,31 +76,89 @@ pub fn onload(plugin: &obsidian::Plugin) {
 }
 
 #[wasm_bindgen]
-struct ExampleStruct {
-    id: String,
+pub struct JsLinker {
+    files: Vec<Result<parser::MDFile>>,
 }
 
 #[wasm_bindgen]
-impl ExampleStruct {
+impl JsLinker {
     #[wasm_bindgen(constructor)]
-    pub fn new(id: JsString) -> ExampleStruct {
-        ExampleStruct {
-            id: id.as_string().unwrap(),
+    pub fn new(file_paths: Vec<JsString>, file_contents: Vec<JsString>) -> Self {
+        // file_map is a map of file paths to file contents
+
+        let mut md_files: Vec<Result<parser::MDFile>> = vec![];
+        for (path, content) in file_paths.iter().zip(file_contents.iter()) {
+            let content: String = content.as_string().unwrap();
+            let path: String = path.as_string().unwrap();
+            md_files.push(parser::parse_md_file_wrapper(content, path));
         }
-    }
-    #[wasm_bindgen(getter)]
-    pub fn id(&self) -> JsString {
-        self.id.clone().into()
-    }
-    #[wasm_bindgen(setter)]
-    pub fn set_id(&mut self, id: JsString) {
-        self.id = id.as_string().unwrap();
+
+        JsLinker { files: md_files }
     }
     #[wasm_bindgen]
-    pub fn do_thing(&self) -> JsString {
-        let mut temp = self.id.clone();
-        temp.push_str(" is the id");
-        temp.into()
+    pub fn get_bad_parse_files(&self) -> Vec<JsString> {
+        let mut bad_files: Vec<JsString> = vec![];
+        for file in &self.files {
+            match file {
+                Ok(_) => (),
+                Err(e) => match e {
+                    Error::ParseError(path, error) => {
+                        bad_files.push(JsString::from(format!("{}", path.display())))
+                    }
+                    _ => (),
+                },
+            }
+        }
+        bad_files
+    }
+    #[wasm_bindgen]
+    pub fn get_links(&self) -> Vec<JsLink> {
+        let mut links: Vec<JsLink> = vec![];
+
+        let mut alias_map: HashMap<&Path, Vec<&str>> = HashMap::new();
+
+        for file in &self.files {
+            let mut aliases: Vec<&str> = vec![];
+            match file {
+                Ok(md_file) => {
+                    let title: &str = md_file.get_title();
+                    aliases.push(title);
+                    let file_aliases: Result<Vec<&str>> = md_file.get_aliases();
+                    let mut aliases: Vec<&str> = vec![title];
+                    match file_aliases {
+                        Ok(file_aliases) => {
+                            for alias in file_aliases {
+                                aliases.push(alias);
+                            }
+                        }
+                        Err(_) => {}
+                    }
+                    alias_map.insert(&md_file.path, aliases);
+                }
+                Err(_) => (),
+            }
+        }
+        let debug_link = JsLink {
+            debug_field: format!("{:?}", alias_map),
+        };
+        links.push(debug_link);
+        links
+    }
+}
+
+#[wasm_bindgen]
+pub struct JsLink {
+    debug_field: String,
+    // source: String,
+    // target: String,
+    // link_text: String,
+}
+
+#[wasm_bindgen]
+impl JsLink {
+    #[wasm_bindgen]
+    pub fn debug(&self) -> String {
+        self.debug_field.clone()
     }
 }
 

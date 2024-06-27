@@ -52,16 +52,19 @@ class ParseModal extends Modal {
 	async onOpen() {
 		const { contentEl } = this;
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
-		let file_dict: { [key: string]: string } = {};
-		await filelist.forEach(async file => {
-			file_dict[file.path] = await this.app.vault.cachedRead(file);
-		});
-		// for path in dict.keys() do thing
+		let file_paths: string[] = filelist.map(file => file.path);
+		let file_contents: string[] = await Promise.all(filelist.map(async file => await this.app.vault.cachedRead(file)));
+		let linker_obj: plugin.JsLinker = new plugin.JsLinker(file_paths, file_contents);
+		let bad_parse_file_errors: string[] = linker_obj.get_bad_parse_files();
 
-		for (let path in file_dict) {
-			console.log(path);
-			let res: string = plugin.parse_file_to_str(file_dict[path]);
-			console.log(res);
+		// for (let error of bad_parse_file_errors) {
+		// 	console.log(`${error}`);
+		// }
+
+		let links: plugin.JsLink[] = linker_obj.get_links();
+
+		for (let link of links) {
+			console.log(`${link.debug()}`);
 		}
 
 		let text = 'Hi there!';
