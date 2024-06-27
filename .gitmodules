@@ -1,0 +1,5 @@
+[submodule "src/md-parser"]
+	path = src/md-parser
+	url = https://github.com/nickrallison/md-parser.git
+[submodule "src/md_parser"]
+	path = src/md_parser

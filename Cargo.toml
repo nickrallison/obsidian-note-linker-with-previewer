@@ -8,11 +8,13 @@ edition = "2018"
 crate-type = ["cdylib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
+wasm-bindgen = "0.2.88"
 js-sys = "0.3.49"
 pest = "2.6"
 pest_derive = "2.6"
 serde_yaml = "0.9.34"
+md_parser = { git = "https://github.com/nickrallison/md_parser.git" }
+getrandom = { version = "0.2", features = ["js"] }
 
 thiserror = "1"
 

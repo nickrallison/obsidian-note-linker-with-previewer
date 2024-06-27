@@ -2,6 +2,7 @@ import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Set
 
 import rustPlugin from "./pkg/obsidian_linker_plugin_bg.wasm";
 import * as plugin from "./pkg/obsidian_linker_plugin.js";
+import { prependListener } from 'process';
 
 // Remember to rename these classes and interfaces!
 
@@ -29,8 +30,8 @@ export default class RustPlugin extends Plugin {
 		plugin.onload(this);
 
 		this.addCommand({
-			id: "open-note-linker",
-			name: "Open",
+			id: "parse",
+			name: "Parse",
 			callback: () => {
 				new ParseModal(this.app).open();
 			}
@@ -57,13 +58,16 @@ class ParseModal extends Modal {
 		const { contentEl } = this;
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
 		let filewrappers: TFileWrapper[] = [];
+		let printer_object = new PrinterObject();
 		filelist.forEach(file => {
+			let filewrappers: TFileWrapper[] = [];
 			filewrappers.push(new TFileWrapper(file));
+			console.log(file.path);
+			let res = plugin.parse_files_to_str(this.app.vault, filelist, printer_object);
 		});
-		let res = plugin.parse_files_to_str(vault, filelist);
 		let example_struct = new plugin.ExampleStruct("test");
-		res = res + ", " + example_struct.do_thing();
-		contentEl.setText(res);
+		let text = example_struct.do_thing();
+		contentEl.setText(text);
 	}
 
 	onClose() {
@@ -140,3 +144,17 @@ class TFileWrapper {
 		this.contents = contents;
 	}
 }
+
+class PrinterObject {
+	constructor() {
+
+	}
+
+	print(str: string) {
+		console.log
+	}
+}
+
+// function printer_func(str: string) {
+// 	console.log(str);
+// }

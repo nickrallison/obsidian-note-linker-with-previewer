@@ -34,6 +34,11 @@ extern "C" {
     #[wasm_bindgen(structural, method)]
     pub fn getFiles(vault: &Vault) -> Vec<TFile>;
 
-    #[wasm_bindgen(js_namespace = console, js_name = log)]
-    fn console_log_str(s: &str);
+    pub type PrinterObject;
+    // #[wasm_bindgen(constructor)]
+    // pub fn new() -> PrinterObject;
+    #[wasm_bindgen(method)]
+    pub fn printer(this: &PrinterObject, s: &str);
+    // #[wasm_bindgen(method)]
+    // pub fn printer_func(s: &str);
 }

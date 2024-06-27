@@ -50,13 +50,17 @@ impl ExampleCommand {
 }
 
 #[wasm_bindgen]
-pub fn parse_files_to_str(vault: obsidian::Vault, filelist: Vec<obsidian::TFile>) -> JsString {
+pub fn parse_files_to_str(
+    vault: obsidian::Vault,
+    filelist: Vec<obsidian::TFileWrapper>,
+    printer: obsidian::PrinterObject,
+) -> JsString {
     for file in filelist.iter() {
-        let content: JsValue = vault.cachedRead(file);
+        let content: JsString = file.get_contents();
         let content: String = content.as_string().unwrap();
+        printer.printer(&status);
         let parsed: parser::MDFile = parser::parse_md_file_wrapper(content);
-        let status: String = format!("Parsed file: {}", file.path);
-        console_log_str(&status);
+        printer.printer(&status);
     }
 
     JsString::from(format!("Number of files: {}", filelist.len()))

@@ -1,43 +1,45 @@
+use core::panic;
 use std::path::PathBuf;
 
 use pest::Parser;
 use pest_derive::Parser;
 
-use crate::prelude::*;
-
 /*
-Grammer:
+Grammar:
 #####
-string_char = _{ (!"$" ~ !"*" ~ !"\n" ~ !"[" ~ !"]" ~ !">" ~ ANY) }
+string_char = _{ (ASCII_ALPHANUMERIC | (!('\u{00}'..'\u{7F}') ~ ANY) | "-" | "–" | "_" | "'" | "\"" | "\\*" | "\\[" | "\\]" | " " | "\t" | "," | "." | "!" | "?" | "(" | ")" | "+" | "=" | ";" | ":" | "/" | "%" | "^" | "{" | "}" | "|" | "\\" | ">" | "<" ) }
 
 filepath = { (!"$" ~ !"*" ~ !"\n" ~ !"[" ~ !"]" ~ !">" ~ ANY)+ }
 
 weblink_link = { (!")" ~ ANY)+ }
 weblink_text = { string_char+ }
 
-bold_italic_node = { "*"{3} ~ node ~ "*"{3} }
-bold_node = { "*"{2} ~ node ~ "*"{2} }
-italic_node = { "*" ~ node ~ "*" }
+bold_italic_node = { "*"{3} ~ ( named_link_node | latex_inline_node | link_node | weblink_node | node)+ ~ "*"{3} }
+bold_node = { "*"{2} ~ ( named_link_node | latex_inline_node | link_node | weblink_node | node)+ ~ "*"{2} }
+italic_node = { "*" ~ ( named_link_node | latex_inline_node | link_node | weblink_node | node)+ ~ "*" }
 named_link_node = { "["{2} ~ filepath ~ "|" ~ node+ ~ "]"{2} }
 link_node = { "["{2} ~ filepath ~ "]"{2} }
 weblink_node = { "[" ~ weblink_text ~ "]" ~ "(" ~ weblink_link ~ ")"}
+square_bracket_node = { "[" ~ (!"]" ~ ANY)+ ~ "]" }
 latex_inline_node = { "$" ~ (!"$" ~ ANY)+ ~ "$" }
+code_inline_node = { "`" ~ (!"`" ~ ANY)+ ~ "`" }
 node = { string_char+ }
 
 heading_line = { "#"{1,6} ~ " " ~ string_line }
 numbered_list_line = { (" " | "\r" | "\t")* ~ ASCII_DIGIT+ ~ "." ~ (" " | "\r" | "\t")+ ~ string_line}
 list_line = { (" " | "\r" | "\t")* ~ "-" ~ (" " | "\r" | "\t")* ~ string_line}
-string_line = { (bold_italic_node | bold_node | italic_node | named_link_node | link_node | weblink_node | latex_inline_node | node)* }
+string_line = { (bold_italic_node | bold_node | italic_node | named_link_node | link_node | weblink_node | square_bracket_node | latex_inline_node | code_inline_node | node)* }
 
-line = { (heading_line | numbered_list_line | list_line | string_line ) ~ NEWLINE }
+line = { (heading_line | numbered_list_line | list_line | string_line ) }
 block_quote_line = { ((" " | "\r" | "\t")* ~ ">" ~ (block_quote_line | line)) }
 
 code_type = { (ASCII_ALPHANUMERIC | "_" | "-" )+ }
+code_block_inner = { (!"```" ~ ANY)* }
 
 block_quote_block = { block_quote_line+ }
 latex_block = { "$$" ~ (!"$" ~ ANY)* ~ "$$" }
-code_block = { "```" ~ code_type?  (!"```" ~ ANY)* ~ "```" }
-string_block = { line+ }
+code_block = { "```" ~ code_type? ~ code_block_inner ~ "```" }
+string_block = { ( line ~ NEWLINE )+ }
 
 
 block = { (block_quote_block | latex_block | code_block | string_block) }
@@ -49,14 +51,15 @@ md_file = { SOI ~ yaml? ~ block+ ~ EOI }
 */
 
 #[derive(Parser)]
-#[grammar = "md.pest"]
+#[grammar = "src/parser/md.pest"]
 pub struct MDParser;
 
 pub fn parse_md_file_wrapper(contents: String) -> MDFile {
     let mut contents = contents;
-    if !contents.ends_with('\n') {
+    if !&contents.ends_with('\n') {
         contents.push('\n');
     }
+
     let pairs: pest::iterators::Pair<Rule> = MDParser::parse(Rule::md_file, &contents)
         .expect("unsuccessful parse")
         .next()
@@ -94,7 +97,6 @@ fn parse_md_file(pairs: pest::iterators::Pair<Rule>) -> MDFile {
             _ => panic!("unexpected rule: {:?}", pair.as_rule()),
         }
     }
-
     result
 }
 
@@ -114,14 +116,13 @@ fn parse_yaml(pair: pest::iterators::Pair<Rule>) -> YAML {
                     yaml: serde_yaml::from_str(pair_inner.as_str()).unwrap(),
                 };
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner.as_rule()),
         }
     }
-    unreachable!()
+    panic!("pairs inner is empty");
 }
 
 #[derive(Debug)]
-
 enum Block {
     BlockQuote(BlockQuote),
     Latex(LatexBlock),
@@ -146,10 +147,10 @@ fn parse_block(pair: pest::iterators::Pair<Rule>) -> Block {
             Rule::string_block => {
                 return Block::String(parse_string_block(pair_inner));
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner.as_rule()),
         }
     }
-    unreachable!()
+    panic!("pairs inner is empty");
 }
 
 fn parse_vec_line_into_block(pairs: Vec<pest::iterators::Pair<Rule>>) -> StringBlock {
@@ -162,7 +163,7 @@ fn parse_vec_line_into_block(pairs: Vec<pest::iterators::Pair<Rule>>) -> StringB
             Rule::line => {
                 lines.push(parse_line(pair));
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair.as_rule()),
         }
     }
     StringBlock { lines }
@@ -309,7 +310,7 @@ fn parse_code_block(pair: pest::iterators::Pair<Rule>) -> CodeBlock {
             Rule::code_block_inner => {
                 code = pair_inner.as_str().to_string();
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner),
         }
     }
 
@@ -331,7 +332,7 @@ fn parse_string_block(pair: pest::iterators::Pair<Rule>) -> StringBlock {
             Rule::line => {
                 lines.push(parse_line(pair_inner));
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner),
         }
     }
 
@@ -365,7 +366,7 @@ fn parse_line(pair: pest::iterators::Pair<Rule>) -> Line {
             Rule::string_line => {
                 result = Line::StringLine(parse_string_line(pair_inner));
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner),
         }
     }
 
@@ -392,7 +393,7 @@ fn parse_numbered_list_line(pair: pest::iterators::Pair<Rule>) -> NumberedList {
             Rule::string_line => {
                 nodes = parse_string_line(pair_inner).nodes;
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner),
         }
     }
 
@@ -421,7 +422,7 @@ fn parse_list_line(pair: pest::iterators::Pair<Rule>) -> BulletedList {
             Rule::string_line => {
                 nodes = parse_string_line(pair_inner).nodes;
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner),
         }
     }
 
@@ -446,7 +447,7 @@ fn parse_heading_line(pair: pest::iterators::Pair<Rule>) -> Heading {
             Rule::string_line => {
                 nodes = parse_string_line(pair_inner).nodes;
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner),
         }
     }
 
@@ -484,13 +485,25 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>) -> StringLine {
             Rule::weblink_node => {
                 nodes.push(Node::WebLink(parse_weblink_node(pair_inner)));
             }
+            Rule::square_bracket_node => {
+                nodes.push(Node::SquareBracket(pair_inner.as_str().to_string()));
+            }
+            Rule::latex_block_inline_node => {
+                nodes.push(Node::InlineLatexBlock(pair_inner.as_str().to_string()));
+            }
+            Rule::code_block_inline_node => {
+                nodes.push(Node::InlineCodeBlock(pair_inner.as_str().to_string()));
+            }
             Rule::latex_inline_node => {
                 nodes.push(Node::InlineLatex(pair_inner.as_str().to_string()));
+            }
+            Rule::code_inline_node => {
+                nodes.push(Node::InlineCode(pair_inner.as_str().to_string()));
             }
             Rule::node => {
                 nodes.push(Node::Text(pair_inner.as_str().to_string()));
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner.as_rule()),
         }
     }
 
@@ -507,8 +520,11 @@ enum Node {
     MDLink(String),
     NamedMDLink(NamedMDLink),
     WebLink(WebLink),
+    SquareBracket(String),
     InlineCode(String),
     InlineLatex(String),
+    InlineCodeBlock(String),
+    InlineLatexBlock(String),
 }
 
 #[derive(Debug)]
@@ -532,7 +548,7 @@ fn parse_named_link_node(pair: pest::iterators::Pair<Rule>) -> NamedMDLink {
             Rule::node => {
                 name = pair_inner.as_str().to_string();
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected rule: {:?}", pair_inner),
         }
     }
 
