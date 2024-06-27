@@ -20,11 +20,6 @@ export default class RustPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		// init wasm
-		// const buffer = Uint8Array.from(atob(rustPlugin), c => c.charCodeAt(0))
-		// await plugin.default(Promise.resolve(buffer));
-		// plugin.onload(this);
-
 		const buffer = Buffer.from(rustPlugin, 'base64')
 		await plugin.default(Promise.resolve(buffer));
 		plugin.onload(this);
@@ -158,6 +153,3 @@ class PrinterObject {
 	}
 }
 
-// function printer_func(str: string) {
-// 	console.log(str);
-// }
