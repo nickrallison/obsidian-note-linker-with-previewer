@@ -53,7 +53,7 @@ md_file = { SOI ~ yaml? ~ block+ ~ EOI }
 use crate::prelude::*;
 
 #[derive(Parser)]
-#[grammar = "src/parser/md.pest"]
+#[grammar = "src/rust/parser/md.pest"]
 pub struct MDParser;
 
 pub fn parse_md_file_wrapper(contents: String) -> Result<MDFile> {
