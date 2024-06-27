@@ -1,7 +1,7 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, Vault } from 'obsidian';
 
-import rustPlugin from "./pkg/obsidian_linker_plugin_bg.wasm";
-import * as plugin from "./pkg/obsidian_linker_plugin.js";
+import rustPlugin from "../../pkg/obsidian_linker_plugin_bg.wasm";
+import * as plugin from "../../pkg/obsidian_linker_plugin.js";
 import { prependListener } from 'process';
 
 // Remember to rename these classes and interfaces!
