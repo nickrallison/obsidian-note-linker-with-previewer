@@ -888,7 +888,8 @@ fn parse_weblink_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
     Ok(WebLink { name, link })
 }
 
-struct StringPosition<'a> {
+#[derive(Debug, Clone)]
+pub(crate) struct StringPosition<'a> {
     string_node: &'a Node,
     line: usize,
     column: usize,

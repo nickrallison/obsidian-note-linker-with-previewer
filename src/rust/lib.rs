@@ -175,26 +175,27 @@ impl JsLinker {
         for file in &self.files {
             match file {
                 Ok(md_file) => {
-                    let content: &str = md_file.get_content();
-                    let links: Vec<JsLink> = JsLinker::get_links_from_file(
-                        content,
-                        &regex,
-                        &alias_map,
-                        &file_groups,
-                        &md_file.path,
-                    );
-                    for link in links {
-                        links.push(link);
-                    }
+                    let string_nodes: Vec<crate::parser::StringPosition> =
+                        md_file.get_string_nodes();
+                    // let links: Vec<JsLink> = JsLinker::get_links_from_file(
+                    //     content,
+                    //     &regex,
+                    //     &alias_map,
+                    //     &file_groups,
+                    //     &md_file.path,
+                    // );
+                    // for link in links {
+                    //     links.push(link);
+                    // }
                 }
                 Err(_) => (),
             }
         }
 
-        let debug_link = JsLink {
-            debug_field: format!("regex_p: {:?}", regex_p),
-        };
-        links.push(debug_link);
+        // let debug_link = JsLink {
+        //     debug_field: format!("regex_p: {:?}", regex_p),
+        // };
+        // links.push(debug_link);
         links
     }
 }
