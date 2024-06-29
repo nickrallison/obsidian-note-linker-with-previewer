@@ -115,6 +115,7 @@ impl JsLinker {
     #[wasm_bindgen]
     pub fn get_links(&self, case_insensitive: bool, link_to_self: bool) -> Vec<JsLink> {
         let mut links: Vec<JsLink> = vec![];
+        let files_len: u32 = self.files.len() as u32;
 
         // constructing a list of aliases for constructing the replace regex
         let mut alias_map: HashMap<&Path, Vec<&str>> = HashMap::new();
@@ -136,7 +137,23 @@ impl JsLinker {
                     }
                     alias_map.insert(&md_file.path, aliases);
                 }
-                Err(_) => (),
+                Err(e) => match e {
+                    _ => {} // Error::Generic(e) => {
+                            //     file_groups.insert(group_index, Err(Error::Generic(e.to_string())));
+                            // }
+                            // Error::IO(e) => {
+                            //     file_groups.insert(
+                            //         group_index,
+                            //         Err(Error::Generic(f!("IO Error: {}", e.to_string()))),
+                            //     );
+                            // }
+                            // Error::ParseError(path, _) => {
+                            //     file_groups.insert(
+                            //         group_index,
+                            //         Err(Error::Generic(f!("Parse Error: {}", path.display()))),
+                            //     );
+                            // }
+                },
             }
         }
 
@@ -147,28 +164,46 @@ impl JsLinker {
         // the regex group of each file is contained here
         // for example the group index of Elliptic Curve Cryptography would be 0, ...
         // ...and the group index of identity element would be 1
-
         let mut file_groups: HashMap<u32, &Path> = HashMap::new();
         let mut group_index: u32 = 1;
-        for (path, aliases) in alias_map.iter() {
-            file_groups.insert(group_index, path);
-            group_index += 1;
-        }
-
         let mut file_regex_strs: Vec<String> = vec![];
-        for (path, aliases) in alias_map.iter() {
-            let mut file_regex_str: String = String::from("(");
+        for file in &self.files {
+            if file.is_err() {
+                continue;
+            }
+            let file: &parser::MDFile = file.as_ref().expect("Expected file");
+            let title: &str = file.get_title();
+            let path: &Path = &file.path;
+            let file_aliases: Result<Vec<&str>> = file.get_aliases();
+            let mut aliases: Vec<&str> = vec![title];
+            match file_aliases {
+                Ok(file_aliases) => {
+                    for alias in file_aliases {
+                        aliases.push(alias);
+                    }
+                }
+                Err(_) => {}
+            }
+            // escape all regex special characters
+            let mut cleaned_aliases: Vec<String> = vec![];
             for alias in aliases {
+                let cleaned_alias: String = regex::escape(alias);
+                cleaned_aliases.push(cleaned_alias);
+            }
+
+            let mut file_regex_str: String = String::new();
+            file_regex_str.push('(');
+            for alias in cleaned_aliases {
                 file_regex_str.push_str(&format!("(?:{})|", alias));
             }
             file_regex_str.pop();
             file_regex_str.push(')');
             file_regex_strs.push(file_regex_str);
+            file_groups.insert(group_index, path);
+            group_index += 1;
         }
 
-        let regex: String = file_regex_strs.join("|");
-        // if case_sensitive {
-
+        let regex: String = file_regex_strs.clone().join("|");
         let regex: Regex = RegexBuilder::new(&regex)
             .case_insensitive(case_insensitive)
             .build()
@@ -187,30 +222,31 @@ impl JsLinker {
 
                         match string {
                             Ok(string) => {
-                                let captures: Vec<regex::Captures> =
-                                    regex.captures_iter(string).collect();
-                                for capture in captures {
-                                    for (i, group) in capture.iter().enumerate() {
-                                        match group {
-                                            Some(group) => {
-                                                let group_index: u32 = i as u32;
-                                                let target: &&Path =
-                                                    file_groups.get(&group_index).unwrap();
-                                                let target_string: String =
-                                                    target.to_string_lossy().to_string();
-                                                let group_str: &str = group.as_str();
-                                                let link = JsLink {
-                                                    source: md_file.get_title().to_string(),
-                                                    target: target_string,
-                                                    link_text: group_str.to_string(),
-                                                    row: row,
-                                                    col: col,
-                                                };
-                                                links.push(link);
-                                            }
-                                            None => (),
-                                        }
+                                let caps: Option<regex::Captures> = regex.captures(string);
+                                let cap_result: Option<(regex::Match, u32)> =
+                                    get_first_capture(caps, files_len);
+                                match cap_result {
+                                    Some((capture, group_index)) => {
+                                        let capture_str: &str = capture.as_str();
+                                        println!("Capture: {}", capture_str);
+                                        println!("Group Index: {}", group_index);
+                                        println!("Target: {:?}", file_groups.get(&group_index));
+                                        println!("#################################");
+                                        let target: &Path =
+                                            file_groups.get(&group_index).expect("expected group");
+
+                                        let source: &Path = &md_file.path;
+                                        let link_text: &str = capture_str;
+                                        let link: JsLink = JsLink {
+                                            source: source.to_string_lossy().to_string(),
+                                            target: target.to_string_lossy().to_string(),
+                                            link_text: link_text.to_string(),
+                                            row: row,
+                                            col: col,
+                                        };
+                                        links.push(link);
                                     }
+                                    None => (),
                                 }
                             }
                             Err(_) => (),
@@ -249,6 +285,24 @@ impl JsLink {
     }
 }
 
+fn get_first_capture(caps: Option<regex::Captures>, caps_len: u32) -> Option<(regex::Match, u32)> {
+    match caps {
+        Some(captures) => {
+            for i in 1..caps_len + 1 {
+                let i: usize = i as usize;
+                if captures.get(i).is_some() {
+                    return Some((
+                        captures.get(i).expect("Expected capture to exist"),
+                        i as u32,
+                    ));
+                }
+            }
+        }
+        None => (),
+    }
+    None
+}
+
 // use wasm_bindgen::prelude::*;
 
 // #[wasm_bindgen]
@@ -259,4 +313,28 @@ impl JsLink {
 // #[wasm_bindgen]
 // pub fn greet_rust(name: &str) {
 //     alert(&format!("Hello, {}!", name));
+// }
+
+// #[cfg(test)]
+// pub mod main_tests {
+
+//     use include_dir::{include_dir, Dir};
+//     use js_sys::JsString;
+
+//     #[test]
+//     fn linker_test() {
+//         static TEST_FILES: Dir = include_dir!("test");
+
+//         let mut paths: Vec<String> = vec![];
+//         let mut contents: Vec<String> = vec![];
+//         for file in TEST_FILES.files() {
+//             paths.push(file.path().to_string_lossy().to_string());
+//             contents.push(file.contents_utf8().unwrap().to_string());
+//         }
+//         let linker = crate::JsLinker::new(
+//             paths.iter().map(|s| s.to_string()).collect(),
+//             contents.iter().map(|s| s.to_string()).collect(),
+//         );
+//         let links = linker.get_links(true, false);
+//     }
 // }
