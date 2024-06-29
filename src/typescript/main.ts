@@ -83,7 +83,7 @@ class ParseModal extends Modal {
 		// }
 
 
-		let links: plugin.JsLink[] = linker_obj.get_links(this.plugin.settings.linker_serrings);
+		let links: plugin.JsLink[] = linker_obj.get_links(this.plugin.settings.caseInsensitive, this.plugin.settings.linkToSelf);
 
 		for (let link of links) {
 			console.log(`${link.debug()}`);

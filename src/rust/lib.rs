@@ -7,6 +7,7 @@ use std::{
 };
 
 use js_sys::JsString;
+use parser::Node;
 use regex::{Regex, RegexBuilder};
 use wasm_bindgen::prelude::*;
 
@@ -112,7 +113,7 @@ impl JsLinker {
         bad_files
     }
     #[wasm_bindgen]
-    pub fn get_links(&self, options: obsidian::RustPluginSettings) -> Vec<JsLink> {
+    pub fn get_links(&self, case_insensitive: bool, link_to_self: bool) -> Vec<JsLink> {
         let mut links: Vec<JsLink> = vec![];
 
         // constructing a list of aliases for constructing the replace regex
@@ -147,10 +148,11 @@ impl JsLinker {
         // for example the group index of Elliptic Curve Cryptography would be 0, ...
         // ...and the group index of identity element would be 1
 
-        let mut file_groups: HashMap<&Path, u32> = HashMap::new();
+        let mut file_groups: HashMap<u32, &Path> = HashMap::new();
+        let mut group_index: u32 = 1;
         for (path, aliases) in alias_map.iter() {
-            let mut group_index: u32 = 0;
-            file_groups.insert(path, group_index);
+            file_groups.insert(group_index, path);
+            group_index += 1;
         }
 
         let mut file_regex_strs: Vec<String> = vec![];
@@ -168,51 +170,82 @@ impl JsLinker {
         // if case_sensitive {
 
         let regex: Regex = RegexBuilder::new(&regex)
-            .case_insensitive(options.get_case_insensitive())
+            .case_insensitive(case_insensitive)
             .build()
             .expect("Invalid Regex");
 
         for file in &self.files {
             match file {
                 Ok(md_file) => {
-                    let string_nodes: Vec<crate::parser::StringPosition> =
+                    let string_positions: Vec<crate::parser::StringPosition> =
                         md_file.get_string_nodes();
-                    // let links: Vec<JsLink> = JsLinker::get_links_from_file(
-                    //     content,
-                    //     &regex,
-                    //     &alias_map,
-                    //     &file_groups,
-                    //     &md_file.path,
-                    // );
-                    // for link in links {
-                    //     links.push(link);
-                    // }
+                    for string_pos in string_positions {
+                        let row: u32 = string_pos.line;
+                        let col: u32 = string_pos.column;
+                        let node: &parser::Node = string_pos.string_node;
+                        let string: Result<&str> = node.get_inner_string();
+
+                        match string {
+                            Ok(string) => {
+                                let captures: Vec<regex::Captures> =
+                                    regex.captures_iter(string).collect();
+                                for capture in captures {
+                                    for (i, group) in capture.iter().enumerate() {
+                                        match group {
+                                            Some(group) => {
+                                                let group_index: u32 = i as u32;
+                                                let target: &&Path =
+                                                    file_groups.get(&group_index).unwrap();
+                                                let target_string: String =
+                                                    target.to_string_lossy().to_string();
+                                                let group_str: &str = group.as_str();
+                                                let link = JsLink {
+                                                    source: md_file.get_title().to_string(),
+                                                    target: target_string,
+                                                    link_text: group_str.to_string(),
+                                                    row: row,
+                                                    col: col,
+                                                };
+                                                links.push(link);
+                                            }
+                                            None => (),
+                                        }
+                                    }
+                                }
+                            }
+                            Err(_) => (),
+                        }
+                    }
                 }
                 Err(_) => (),
             }
         }
 
-        // let debug_link = JsLink {
-        //     debug_field: format!("regex_p: {:?}", regex_p),
-        // };
-        // links.push(debug_link);
+        if !link_to_self {
+            links.retain(|link| link.source != link.target);
+        }
+
         links
     }
 }
 
 #[wasm_bindgen]
 pub struct JsLink {
-    debug_field: String,
-    // source: String,
-    // target: String,
-    // link_text: String,
+    source: String,
+    target: String,
+    link_text: String,
+    row: u32,
+    col: u32,
 }
 
 #[wasm_bindgen]
 impl JsLink {
     #[wasm_bindgen]
     pub fn debug(&self) -> String {
-        self.debug_field.clone()
+        format!(
+            "Source: {}, Target: {}, Link Text: {}, Row: {}, Col: {}",
+            self.source, self.target, self.link_text, self.row, self.col
+        )
     }
 }
 

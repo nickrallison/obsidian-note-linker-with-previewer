@@ -820,6 +820,39 @@ impl Node {
             Node::InlineLatexBlock(_) => vec![],
         }
     }
+
+    pub(crate) fn get_inner_string(&self) -> Result<&str> {
+        match self {
+            Node::Text(s) => Ok(s.as_str()),
+            Node::BoldItalic(s) => Ok(s.as_str()),
+            Node::Bold(s) => Ok(s.as_str()),
+            Node::Italic(s) => Ok(s.as_str()),
+            Node::MDLink(_) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from MDLink"
+            ))),
+            Node::NamedMDLink(_) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from NamedMDLink"
+            ))),
+            Node::WebLink(_) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from WebLink"
+            ))),
+            Node::SquareBracket(_) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from SquareBracket"
+            ))),
+            Node::InlineCode(_) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from InlineCode"
+            ))),
+            Node::InlineLatex(_) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from InlineLatex"
+            ))),
+            Node::InlineCodeBlock(_) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from InlineCodeBlock"
+            ))),
+            Node::InlineLatexBlock(_) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from InlineLatexBlock"
+            ))),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -890,7 +923,7 @@ fn parse_weblink_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
 
 #[derive(Debug, Clone)]
 pub(crate) struct StringPosition<'a> {
-    string_node: &'a Node,
-    line: usize,
-    column: usize,
+    pub string_node: &'a Node,
+    pub line: u32,
+    pub column: u32,
 }
