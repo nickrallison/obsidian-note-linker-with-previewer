@@ -228,10 +228,10 @@ impl JsLinker {
                                 match cap_result {
                                     Some((capture, group_index)) => {
                                         let capture_str: &str = capture.as_str();
-                                        println!("Capture: {}", capture_str);
-                                        println!("Group Index: {}", group_index);
-                                        println!("Target: {:?}", file_groups.get(&group_index));
-                                        println!("#################################");
+                                        // println!("Capture: {}", capture_str);
+                                        // println!("Group Index: {}", group_index);
+                                        // println!("Target: {:?}", file_groups.get(&group_index));
+                                        // println!("#################################");
                                         let target: &Path =
                                             file_groups.get(&group_index).expect("expected group");
 
