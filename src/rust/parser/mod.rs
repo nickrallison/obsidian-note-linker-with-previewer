@@ -711,44 +711,65 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<S
     debug_assert!(pair.as_rule() == Rule::string_line);
 
     let mut nodes: Vec<Node> = Vec::new();
-
     for pair_inner in pair.into_inner() {
+        let start_pos = pair_inner.as_span().start();
+        let (line, col) = pair_inner.as_span().start_pos().line_col();
+        let position = NodePosition {
+            line: line as u32,
+            column: col as u32,
+            start: start_pos as u32,
+        };
         match pair_inner.as_rule() {
             Rule::bold_italic_node => {
-                nodes.push(Node::BoldItalic(pair_inner.as_str().to_string()));
+                nodes.push(Node::BoldItalic(pair_inner.as_str().to_string(), position));
             }
             Rule::bold_node => {
-                nodes.push(Node::Bold(pair_inner.as_str().to_string()));
+                nodes.push(Node::Bold(pair_inner.as_str().to_string(), position));
             }
             Rule::italic_node => {
-                nodes.push(Node::Italic(pair_inner.as_str().to_string()));
+                nodes.push(Node::Italic(pair_inner.as_str().to_string(), position));
             }
             Rule::named_link_node => {
-                nodes.push(Node::NamedMDLink(parse_named_link_node(pair_inner, &path)?));
+                nodes.push(Node::NamedMDLink(
+                    parse_named_link_node(pair_inner, &path)?,
+                    position,
+                ));
             }
             Rule::link_node => {
-                nodes.push(Node::MDLink(pair_inner.as_str().to_string()));
+                nodes.push(Node::MDLink(pair_inner.as_str().to_string(), position));
             }
             Rule::weblink_node => {
-                nodes.push(Node::WebLink(parse_weblink_node(pair_inner, &path)?));
+                nodes.push(Node::WebLink(
+                    parse_weblink_node(pair_inner, &path)?,
+                    position,
+                ));
             }
             Rule::square_bracket_node => {
-                nodes.push(Node::SquareBracket(pair_inner.as_str().to_string()));
+                nodes.push(Node::SquareBracket(
+                    pair_inner.as_str().to_string(),
+                    position,
+                ));
             }
             Rule::latex_block_inline_node => {
-                nodes.push(Node::InlineLatexBlock(pair_inner.as_str().to_string()));
+                nodes.push(Node::InlineLatexBlock(
+                    pair_inner.as_str().to_string(),
+                    position,
+                ));
             }
             Rule::code_block_inline_node => {
-                nodes.push(Node::InlineCodeBlock(pair_inner.as_str().to_string()));
+                nodes.push(Node::InlineCodeBlock(
+                    pair_inner.as_str().to_string(),
+                    position,
+                ));
             }
             Rule::latex_inline_node => {
-                nodes.push(Node::InlineLatex(pair_inner.as_str().to_string()));
+                nodes.push(Node::InlineLatex(pair_inner.as_str().to_string(), position));
             }
             Rule::code_inline_node => {
-                nodes.push(Node::InlineCode(pair_inner.as_str().to_string()));
+                nodes.push(Node::InlineCode(pair_inner.as_str().to_string(), position));
             }
             Rule::node => {
-                nodes.push(Node::Text(pair_inner.as_str().to_string()));
+                nodes.push(Node::Text(pair_inner.as_str().to_string(), position));
             }
             _ => {
                 return Err(Error::ParseError(
@@ -763,92 +784,103 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<S
 }
 
 #[derive(Debug)]
+pub struct NodePosition {
+    pub line: u32,
+    pub column: u32,
+    pub start: u32,
+}
+
+#[derive(Debug)]
 
 pub enum Node {
-    Text(String),
-    BoldItalic(String),
-    Bold(String),
-    Italic(String),
-    MDLink(String),
-    NamedMDLink(NamedMDLink),
-    WebLink(WebLink),
-    SquareBracket(String),
-    InlineCode(String),
-    InlineLatex(String),
-    InlineCodeBlock(String),
-    InlineLatexBlock(String),
+    Text(String, NodePosition),
+    BoldItalic(String, NodePosition),
+    Bold(String, NodePosition),
+    Italic(String, NodePosition),
+    MDLink(String, NodePosition),
+    NamedMDLink(NamedMDLink, NodePosition),
+    WebLink(WebLink, NodePosition),
+    SquareBracket(String, NodePosition),
+    InlineCode(String, NodePosition),
+    InlineLatex(String, NodePosition),
+    InlineCodeBlock(String, NodePosition),
+    InlineLatexBlock(String, NodePosition),
 }
 
 impl Node {
     pub fn get_string_node(&self) -> Vec<StringPosition> {
         match self {
-            Node::Text(_) => {
+            Node::Text(_, pos) => {
                 vec![StringPosition {
                     string_node: self,
-                    line: 0,
-                    column: 0,
+                    line: pos.line,
+                    column: pos.column,
+                    start: pos.start,
                 }]
             }
-            Node::BoldItalic(_) => {
+            Node::BoldItalic(_, pos) => {
                 vec![StringPosition {
                     string_node: self,
-                    line: 0,
-                    column: 0,
+                    line: pos.line,
+                    column: pos.column,
+                    start: pos.start,
                 }]
             }
-            Node::Bold(_) => {
+            Node::Bold(_, pos) => {
                 vec![StringPosition {
                     string_node: self,
-                    line: 0,
-                    column: 0,
+                    line: pos.line,
+                    column: pos.column,
+                    start: pos.start,
                 }]
             }
-            Node::Italic(_) => {
+            Node::Italic(_, pos) => {
                 vec![StringPosition {
                     string_node: self,
-                    line: 0,
-                    column: 0,
+                    line: pos.line,
+                    column: pos.column,
+                    start: pos.start,
                 }]
             }
-            Node::MDLink(_) => vec![],
-            Node::NamedMDLink(_) => vec![],
-            Node::WebLink(_) => vec![],
-            Node::SquareBracket(_) => vec![],
-            Node::InlineCode(_) => vec![],
-            Node::InlineLatex(_) => vec![],
-            Node::InlineCodeBlock(_) => vec![],
-            Node::InlineLatexBlock(_) => vec![],
+            Node::MDLink(_, _) => vec![],
+            Node::NamedMDLink(_, _) => vec![],
+            Node::WebLink(_, _) => vec![],
+            Node::SquareBracket(_, _) => vec![],
+            Node::InlineCode(_, _) => vec![],
+            Node::InlineLatex(_, _) => vec![],
+            Node::InlineCodeBlock(_, _) => vec![],
+            Node::InlineLatexBlock(_, _) => vec![],
         }
     }
 
     pub(crate) fn get_inner_string(&self) -> Result<&str> {
         match self {
-            Node::Text(s) => Ok(s.as_str()),
-            Node::BoldItalic(s) => Ok(s.as_str()),
-            Node::Bold(s) => Ok(s.as_str()),
-            Node::Italic(s) => Ok(s.as_str()),
-            Node::MDLink(_) => Err(Error::Generic(f!(
+            Node::Text(s, _) => Ok(s.as_str()),
+            Node::BoldItalic(s, _) => Ok(s.as_str()),
+            Node::Bold(s, _) => Ok(s.as_str()),
+            Node::Italic(s, _) => Ok(s.as_str()),
+            Node::MDLink(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from MDLink"
             ))),
-            Node::NamedMDLink(_) => Err(Error::Generic(f!(
+            Node::NamedMDLink(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from NamedMDLink"
             ))),
-            Node::WebLink(_) => Err(Error::Generic(f!(
+            Node::WebLink(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from WebLink"
             ))),
-            Node::SquareBracket(_) => Err(Error::Generic(f!(
+            Node::SquareBracket(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from SquareBracket"
             ))),
-            Node::InlineCode(_) => Err(Error::Generic(f!(
+            Node::InlineCode(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from InlineCode"
             ))),
-            Node::InlineLatex(_) => Err(Error::Generic(f!(
+            Node::InlineLatex(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from InlineLatex"
             ))),
-            Node::InlineCodeBlock(_) => Err(Error::Generic(f!(
+            Node::InlineCodeBlock(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from InlineCodeBlock"
             ))),
-            Node::InlineLatexBlock(_) => Err(Error::Generic(f!(
+            Node::InlineLatexBlock(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from InlineLatexBlock"
             ))),
         }
@@ -926,4 +958,39 @@ pub(crate) struct StringPosition<'a> {
     pub string_node: &'a Node,
     pub line: u32,
     pub column: u32,
+    pub start: u32,
+}
+
+#[cfg(test)]
+pub mod parser_tests {
+    use super::*;
+    use crate::prelude::*;
+
+    #[test]
+    fn test_parse_md_file() {
+        let path = "test/Address Resolution Protocol.md";
+        let contents =
+            include_str!("../../../test/Address Resolution Protocol.md").to_string() + "\n";
+
+        let parse_result = MDParser::parse(Rule::md_file, &contents)
+            .unwrap()
+            .next()
+            .unwrap();
+
+        let span = parse_result.as_span();
+        println!("{:?}", span);
+
+        let inner = parse_result.into_inner();
+        let flat = inner.flatten();
+        for pair in flat {
+            println!("{:?}", pair);
+        }
+        // print text inside the span
+        // println!("{}", span.as_str());
+
+        // let tokens = parse_result.tokens();
+        // for token in tokens {
+        //     println!("{:?}", token);
+        // }
+    }
 }

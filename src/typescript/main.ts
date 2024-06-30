@@ -75,6 +75,10 @@ class ParseModal extends Modal {
 		const { contentEl } = this;
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
 		let file_paths: string[] = filelist.map(file => file.path);
+		let file_map: { [key: string]: string } = {};
+		for (let file of filelist) {
+			file_map[file.path] = await this.app.vault.cachedRead(file);
+		}
 		let file_contents: string[] = await Promise.all(filelist.map(async file => await this.app.vault.cachedRead(file)));
 		let linker_obj: plugin.JsLinker = new plugin.JsLinker(file_paths, file_contents);
 		let bad_parse_file_errors: string[] = linker_obj.get_bad_parse_files();
@@ -87,7 +91,24 @@ class ParseModal extends Modal {
 
 		for (let link of links) {
 			console.log(`${link.debug()}`);
+			let slice_start = link.get_start();
+			let source = link.get_source();
+			let link_text = link.get_link_text();
+			let link_len = link_text.length;
+			let content = file_map[source];
+
+			let slice_end = content.length
+			let bound = slice_start + link_len + 20;
+			if (bound < slice_end) {
+				slice_end = bound;
+			}
+
+			// print content after the link
+			let slice_str = content.slice(slice_start, slice_end);
+			console.log(`${slice_str}`);
 		}
+
+
 
 		let text = 'Hi there!';
 		contentEl.setText(text);

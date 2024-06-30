@@ -158,7 +158,7 @@ impl JsLinker {
         }
 
         // constructing the replace regex
-        // ((?:Elliptic Curve Cryptography)|(?:Elliptic Curve))|((?:identity element)|(?:identity))
+        // ((?:\bElliptic Curve Cryptography\b)|(?:\bElliptic Curve\b))|((?:\bidentity element\b)|(?:\bidentity\b))
         // all of the aliases from a file are grouped together
 
         // the regex group of each file is contained here
@@ -194,7 +194,7 @@ impl JsLinker {
             let mut file_regex_str: String = String::new();
             file_regex_str.push('(');
             for alias in cleaned_aliases {
-                file_regex_str.push_str(&format!("(?:{})|", alias));
+                file_regex_str.push_str(&format!("(?:\\b{}\\b)|", alias));
             }
             file_regex_str.pop();
             file_regex_str.push(')');
@@ -217,6 +217,7 @@ impl JsLinker {
                     for string_pos in string_positions {
                         let row: u32 = string_pos.line;
                         let col: u32 = string_pos.column;
+                        let start: u32 = string_pos.start;
                         let node: &parser::Node = string_pos.string_node;
                         let string: Result<&str> = node.get_inner_string();
 
@@ -228,10 +229,7 @@ impl JsLinker {
                                 match cap_result {
                                     Some((capture, group_index)) => {
                                         let capture_str: &str = capture.as_str();
-                                        // println!("Capture: {}", capture_str);
-                                        // println!("Group Index: {}", group_index);
-                                        // println!("Target: {:?}", file_groups.get(&group_index));
-                                        // println!("#################################");
+                                        let cap_start = capture.start() as u32;
                                         let target: &Path =
                                             file_groups.get(&group_index).expect("expected group");
 
@@ -243,6 +241,7 @@ impl JsLinker {
                                             link_text: link_text.to_string(),
                                             row: row,
                                             col: col,
+                                            start: start + cap_start,
                                         };
                                         links.push(link);
                                     }
@@ -272,6 +271,7 @@ pub struct JsLink {
     link_text: String,
     row: u32,
     col: u32,
+    start: u32,
 }
 
 #[wasm_bindgen]
@@ -282,6 +282,30 @@ impl JsLink {
             "Source: {}, Target: {}, Link Text: {}, Row: {}, Col: {}",
             self.source, self.target, self.link_text, self.row, self.col
         )
+    }
+    #[wasm_bindgen]
+    pub fn get_source(&self) -> JsString {
+        JsString::from(self.source.clone())
+    }
+    // #[wasm_bindgen(getter)]
+    // pub fn get_target(&self) -> JsString {
+    //     JsString::from(self.target.clone())
+    // }
+    #[wasm_bindgen]
+    pub fn get_link_text(&self) -> JsString {
+        JsString::from(self.link_text.clone())
+    }
+    // #[wasm_bindgen(getter)]
+    // pub fn get_row(&self) -> JsValue {
+    //     self.row.into()
+    // }
+    // #[wasm_bindgen(getter)]
+    // pub fn get_col(&self) -> JsValue {
+    //     self.col.into()
+    // }
+    #[wasm_bindgen]
+    pub fn get_start(&self) -> JsValue {
+        self.start.into()
     }
 }
 
