@@ -15,8 +15,8 @@ yarn install
 yarn run dev
 ```
 
-### Requirements
+### Dev Requirements
 
-cargo
-wasm-pack
-yarn
+- cargo
+- wasm-pack
+- yarn
