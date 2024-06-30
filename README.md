@@ -2,6 +2,7 @@
 
 ## How to Use
 
+
 ## Developement
 
 ### Building
@@ -20,3 +21,12 @@ yarn run dev
 - cargo
 - wasm-pack
 - yarn
+
+### Todo
+
+- Organization
+	- Add CI Build
+ 	- Add Tests
+    - Refactor Rust to be more modular
+    	- Get Imports / Functions Working more Easily
+     - Add Nix Flake to build more easily 
