@@ -215,10 +215,12 @@ impl JsLinker {
                     let string_positions: Vec<crate::parser::StringPosition> =
                         md_file.get_string_nodes();
                     for string_pos in string_positions {
-                        let row: u32 = string_pos.line;
-                        let col: u32 = string_pos.column;
+                        // let row: u32 = string_pos.line;
+                        // let col: u32 = string_pos.column;
                         let start: u32 = string_pos.start;
+                        let end: u32 = string_pos.end;
                         let node: &parser::Node = string_pos.string_node;
+                        // let entire_string = node.get_entire_string();
                         let string: Result<&str> = node.get_inner_string();
 
                         match string {
@@ -236,12 +238,15 @@ impl JsLinker {
                                         let source: &Path = &md_file.path;
                                         let link_text: &str = capture_str;
                                         let link: JsLink = JsLink {
+                                            // debug: entire_string,
                                             source: source.to_string_lossy().to_string(),
                                             target: target.to_string_lossy().to_string(),
                                             link_text: link_text.to_string(),
-                                            row: row,
-                                            col: col,
+                                            // row: row,
+                                            // col: col,
                                             start: start + cap_start,
+                                            // start + link_text length
+                                            end: start + cap_start + link_text.len() as u32,
                                         };
                                         links.push(link);
                                     }
@@ -266,12 +271,14 @@ impl JsLinker {
 
 #[wasm_bindgen]
 pub struct JsLink {
+    // debug: String,
     source: String,
     target: String,
     link_text: String,
-    row: u32,
-    col: u32,
+    // row: u32,
+    // col: u32,
     start: u32,
+    end: u32,
 }
 
 #[wasm_bindgen]
@@ -279,8 +286,8 @@ impl JsLink {
     #[wasm_bindgen]
     pub fn debug(&self) -> String {
         format!(
-            "Source: {}, Target: {}, Link Text: {}, Row: {}, Col: {}",
-            self.source, self.target, self.link_text, self.row, self.col
+            "Source: {}, Target: {}, Link Text: {}, Start: {}, End: {}",
+            self.source, self.target, self.link_text, self.start, self.end
         )
     }
     #[wasm_bindgen]
@@ -306,6 +313,10 @@ impl JsLink {
     #[wasm_bindgen]
     pub fn get_start(&self) -> JsValue {
         self.start.into()
+    }
+    #[wasm_bindgen]
+    pub fn get_end(&self) -> JsValue {
+        self.end.into()
     }
 }
 

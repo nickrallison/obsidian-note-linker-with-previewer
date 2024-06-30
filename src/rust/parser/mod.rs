@@ -1,5 +1,6 @@
 use core::panic;
 use std::{
+    f32::consts::E,
     path::{Path, PathBuf},
     vec,
 };
@@ -190,7 +191,7 @@ fn parse_md_file(pairs: pest::iterators::Pair<Rule>, path: &Path) -> Result<MDFi
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair.as_rule()),
+                    format!("unexpected rule 1: {:?}", pair.as_rule()),
                 ))
             }
         }
@@ -217,7 +218,7 @@ fn parse_yaml(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<YAML> {
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner.as_rule()),
+                    format!("unexpected rule 2: {:?}", pair_inner.as_rule()),
                 ))
             }
         }
@@ -283,7 +284,7 @@ fn parse_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Block> 
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner.as_rule()),
+                    format!("unexpected rule 3: {:?}", pair_inner.as_rule()),
                 ))
             }
         }
@@ -310,7 +311,7 @@ fn parse_vec_line_into_block(
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair.as_rule()),
+                    format!("unexpected rule 4: {:?}", pair.as_rule()),
                 ))
             }
         }
@@ -369,7 +370,7 @@ fn parse_block_quote_lines(
                     _ => {
                         return Err(Error::ParseError(
                             path.to_path_buf(),
-                            format!("unexpected rule: {:?}", pair_inner),
+                            format!("unexpected rule 5: {:?}", pair_inner),
                         ))
                     }
                 },
@@ -386,7 +387,7 @@ fn parse_block_quote_lines(
                     _ => {
                         return Err(Error::ParseError(
                             path.to_path_buf(),
-                            format!("unexpected rule: {:?}", pair_inner),
+                            format!("unexpected rule 6: {:?}", pair_inner),
                         ))
                     }
                 },
@@ -404,7 +405,7 @@ fn parse_block_quote_lines(
                     _ => {
                         return Err(Error::ParseError(
                             path.to_path_buf(),
-                            format!("unexpected rule: {:?}", pair_inner),
+                            format!("unexpected rule 7: {:?}", pair_inner),
                         ))
                     }
                 },
@@ -480,7 +481,7 @@ fn parse_code_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Co
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner),
+                    format!("unexpected rule 8: {:?}", pair_inner),
                 ))
             }
         }
@@ -507,7 +508,7 @@ fn parse_string_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner),
+                    format!("unexpected rule 9: {:?}", pair_inner),
                 ))
             }
         }
@@ -593,7 +594,7 @@ fn parse_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Line> {
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner),
+                    format!("unexpected rule 10: {:?}", pair_inner),
                 ))
             }
         }
@@ -628,7 +629,7 @@ fn parse_numbered_list_line(
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner),
+                    format!("unexpected rule 11: {:?}", pair_inner),
                 ))
             }
         }
@@ -662,7 +663,7 @@ fn parse_list_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Bul
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner),
+                    format!("unexpected rule 12: {:?}", pair_inner),
                 ))
             }
         }
@@ -692,7 +693,7 @@ fn parse_heading_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner),
+                    format!("unexpected rule 13: {:?}", pair_inner),
                 ))
             }
         }
@@ -713,21 +714,30 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<S
     let mut nodes: Vec<Node> = Vec::new();
     for pair_inner in pair.into_inner() {
         let start_pos = pair_inner.as_span().start();
+        let end_pos = pair_inner.as_span().end();
         let (line, col) = pair_inner.as_span().start_pos().line_col();
         let position = NodePosition {
-            line: line as u32,
-            column: col as u32,
+            // line: line as u32,
+            // column: col as u32,
             start: start_pos as u32,
+            end: end_pos as u32,
+            // span_str: pair_inner.as_str().to_string(),
         };
         match pair_inner.as_rule() {
             Rule::bold_italic_node => {
-                nodes.push(Node::BoldItalic(pair_inner.as_str().to_string(), position));
+                let mut inner_nodes: Vec<Node> = Vec::new();
+                inner_nodes.append(&mut parse_string_line(pair_inner, &path)?.nodes.clone());
+                nodes.push(Node::BoldItalic(inner_nodes, position));
             }
             Rule::bold_node => {
-                nodes.push(Node::Bold(pair_inner.as_str().to_string(), position));
+                let mut inner_nodes: Vec<Node> = Vec::new();
+                inner_nodes.append(&mut parse_string_line(pair_inner, &path)?.nodes.clone());
+                nodes.push(Node::Bold(inner_nodes, position));
             }
             Rule::italic_node => {
-                nodes.push(Node::Italic(pair_inner.as_str().to_string(), position));
+                let mut inner_nodes: Vec<Node> = Vec::new();
+                inner_nodes.append(&mut parse_string_line(pair_inner, &path)?.nodes.clone());
+                nodes.push(Node::Italic(inner_nodes, position));
             }
             Rule::named_link_node => {
                 nodes.push(Node::NamedMDLink(
@@ -774,7 +784,7 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<S
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner.as_rule()),
+                    format!("unexpected rule 14: {:?}", pair_inner.as_rule()),
                 ))
             }
         }
@@ -783,20 +793,23 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<S
     Ok(StringLine { nodes })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NodePosition {
-    pub line: u32,
-    pub column: u32,
+    // pub line: u32,
+    // pub column: u32,
     pub start: u32,
+    pub end: u32,
+    // debug only
+    // pub span_str: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub enum Node {
     Text(String, NodePosition),
-    BoldItalic(String, NodePosition),
-    Bold(String, NodePosition),
-    Italic(String, NodePosition),
+    BoldItalic(Vec<Node>, NodePosition),
+    Bold(Vec<Node>, NodePosition),
+    Italic(Vec<Node>, NodePosition),
     MDLink(String, NodePosition),
     NamedMDLink(NamedMDLink, NodePosition),
     WebLink(WebLink, NodePosition),
@@ -813,34 +826,41 @@ impl Node {
             Node::Text(_, pos) => {
                 vec![StringPosition {
                     string_node: self,
-                    line: pos.line,
-                    column: pos.column,
+                    // line: pos.line,
+                    // column: pos.column,
                     start: pos.start,
+                    end: pos.end,
                 }]
             }
-            Node::BoldItalic(_, pos) => {
-                vec![StringPosition {
-                    string_node: self,
-                    line: pos.line,
-                    column: pos.column,
-                    start: pos.start,
-                }]
+            Node::BoldItalic(nodes, pos) => {
+                let mut nodes_inner: Vec<StringPosition> = Vec::new();
+                for node in nodes {
+                    let inner_nodes = node.get_string_node();
+                    for node in inner_nodes {
+                        nodes_inner.push(node);
+                    }
+                }
+                nodes_inner
             }
-            Node::Bold(_, pos) => {
-                vec![StringPosition {
-                    string_node: self,
-                    line: pos.line,
-                    column: pos.column,
-                    start: pos.start,
-                }]
+            Node::Bold(nodes, pos) => {
+                let mut nodes_inner: Vec<StringPosition> = Vec::new();
+                for node in nodes {
+                    let inner_nodes = node.get_string_node();
+                    for node in inner_nodes {
+                        nodes_inner.push(node);
+                    }
+                }
+                nodes_inner
             }
-            Node::Italic(_, pos) => {
-                vec![StringPosition {
-                    string_node: self,
-                    line: pos.line,
-                    column: pos.column,
-                    start: pos.start,
-                }]
+            Node::Italic(nodes, pos) => {
+                let mut nodes_inner: Vec<StringPosition> = Vec::new();
+                for node in nodes {
+                    let inner_nodes = node.get_string_node();
+                    for node in inner_nodes {
+                        nodes_inner.push(node);
+                    }
+                }
+                nodes_inner
             }
             Node::MDLink(_, _) => vec![],
             Node::NamedMDLink(_, _) => vec![],
@@ -856,9 +876,15 @@ impl Node {
     pub(crate) fn get_inner_string(&self) -> Result<&str> {
         match self {
             Node::Text(s, _) => Ok(s.as_str()),
-            Node::BoldItalic(s, _) => Ok(s.as_str()),
-            Node::Bold(s, _) => Ok(s.as_str()),
-            Node::Italic(s, _) => Ok(s.as_str()),
+            Node::BoldItalic(s, _) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from BoldItalic"
+            ))),
+            Node::Bold(s, _) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from Bold"
+            ))),
+            Node::Italic(s, _) => Err(Error::Generic(f!(
+                "Unexpected call to get_inner_string from Italic"
+            ))),
             Node::MDLink(_, _) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from MDLink"
             ))),
@@ -885,9 +911,27 @@ impl Node {
             ))),
         }
     }
+
+    // pub fn get_entire_string(&self) -> String {
+    //     let pos = match self {
+    //         Node::Text(_, pos) => pos,
+    //         Node::BoldItalic(_, pos) => pos,
+    //         Node::Bold(_, pos) => pos,
+    //         Node::Italic(_, pos) => pos,
+    //         Node::MDLink(_, pos) => pos,
+    //         Node::NamedMDLink(_, pos) => pos,
+    //         Node::WebLink(_, pos) => pos,
+    //         Node::SquareBracket(_, pos) => pos,
+    //         Node::InlineCode(_, pos) => pos,
+    //         Node::InlineLatex(_, pos) => pos,
+    //         Node::InlineCodeBlock(_, pos) => pos,
+    //         Node::InlineLatexBlock(_, pos) => pos,
+    //     };
+    //     pos.span_str.clone()
+    // }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct NamedMDLink {
     pub name: String,
@@ -911,7 +955,7 @@ fn parse_named_link_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Resu
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner),
+                    format!("unexpected rule 15: {:?}", pair_inner),
                 ))
             }
         }
@@ -920,7 +964,7 @@ fn parse_named_link_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Resu
     Ok(NamedMDLink { name, link })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct WebLink {
     pub name: String,
@@ -944,7 +988,7 @@ fn parse_weblink_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
             _ => {
                 return Err(Error::ParseError(
                     path.to_path_buf(),
-                    format!("unexpected rule: {:?}", pair_inner),
+                    format!("unexpected rule 16: {:?}", pair_inner),
                 ))
             }
         }
@@ -956,9 +1000,10 @@ fn parse_weblink_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
 #[derive(Debug, Clone)]
 pub(crate) struct StringPosition<'a> {
     pub string_node: &'a Node,
-    pub line: u32,
-    pub column: u32,
+    // pub line: u32,
+    // pub column: u32,
     pub start: u32,
+    pub end: u32,
 }
 
 #[cfg(test)]
@@ -968,29 +1013,32 @@ pub mod parser_tests {
 
     #[test]
     fn test_parse_md_file() {
-        let path = "test/Address Resolution Protocol.md";
-        let contents =
-            include_str!("../../../test/Address Resolution Protocol.md").to_string() + "\n";
+        let path = "test/";
+        for file in std::fs::read_dir(path).unwrap() {
+            println!("{:?}", file);
+            let file = file.unwrap();
+            let path = file.path();
+            let path = path.to_str().unwrap();
+            let contents = std::fs::read_to_string(path).unwrap() + "\n";
+            let md_file = MDParser::parse(Rule::md_file, &contents);
+            if md_file.is_err() {
+                continue;
+            }
+            let md_file = md_file.unwrap();
+            let flattened = md_file.flatten();
+            for inner in flattened {
+                let start = inner.as_span().start();
+                let end = inner.as_span().end();
 
-        let parse_result = MDParser::parse(Rule::md_file, &contents)
-            .unwrap()
-            .next()
-            .unwrap();
-
-        let span = parse_result.as_span();
-        println!("{:?}", span);
-
-        let inner = parse_result.into_inner();
-        let flat = inner.flatten();
-        for pair in flat {
-            println!("{:?}", pair);
+                // assert that the contents from start to end are the same as the inner.as_str()
+                assert!(&contents[start..end] == inner.as_str());
+            }
         }
-        // print text inside the span
-        // println!("{}", span.as_str());
+        // let contents = include_str!("../../../test/Algorithm Specifications.md").to_string() + "\n";
 
-        // let tokens = parse_result.tokens();
-        // for token in tokens {
-        //     println!("{:?}", token);
-        // }
+        // let parse_result = MDParser::parse(Rule::md_file, &contents)
+        //     .unwrap()
+        //     .next()
+        //     .unwrap();
     }
 }

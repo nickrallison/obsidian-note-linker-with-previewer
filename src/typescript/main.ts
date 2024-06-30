@@ -73,6 +73,7 @@ class ParseModal extends Modal {
 	async onOpen() {
 
 		const { contentEl } = this;
+		console.log('Parsing files');
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
 		let file_paths: string[] = filelist.map(file => file.path);
 		let file_map: { [key: string]: string } = {};
@@ -92,19 +93,25 @@ class ParseModal extends Modal {
 		for (let link of links) {
 			console.log(`${link.debug()}`);
 			let slice_start = link.get_start();
+			let slice_end = link.get_end();
 			let source = link.get_source();
 			let link_text = link.get_link_text();
 			let link_len = link_text.length;
 			let content = file_map[source];
 
-			let slice_end = content.length
-			let bound = slice_start + link_len + 20;
-			if (bound < slice_end) {
-				slice_end = bound;
-			}
+			// let bound = slice_start + slice_end + 20;
+			// if (bound < slice_end) {
+			// 	slice_end = bound;
+			// }
 
 			// print content after the link
-			let slice_str = content.slice(slice_start, slice_end);
+			// let slice_str = content.slice(slice_start, slice_end);
+			let encoder = new TextEncoder();
+			let decoder = new TextDecoder();
+			let byteArray = encoder.encode(content);
+
+			let slicedArray = byteArray.slice(slice_start, slice_end);
+			let slice_str = decoder.decode(slicedArray);
 			console.log(`${slice_str}`);
 		}
 
