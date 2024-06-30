@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, Vault } from 'obsidian';
+import { App, Component, Editor, MarkdownRenderer, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, Vault } from 'obsidian';
 
 import rustPlugin from "../../pkg/obsidian_linker_plugin_bg.wasm";
 import * as plugin from "../../pkg/obsidian_linker_plugin.js";
@@ -31,7 +31,10 @@ class RustPluginSettings {
 
 const DEFAULT_SETTINGS: RustPluginSettings = new RustPluginSettings(true, false);
 
-
+interface FileChange {
+	file_path: string;
+	new_content: string;
+}
 
 export default class RustPlugin extends Plugin {
 	settings: RustPluginSettings;
@@ -47,9 +50,64 @@ export default class RustPlugin extends Plugin {
 			id: "parse",
 			name: "Parse",
 			callback: () => {
-				new ParseModal(this).open();
+				this.run_linker()
 			}
 		});
+	}
+
+	async run_linker() {
+		console.log('Parsing Files');
+		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
+		let file_paths: string[] = filelist.map(file => file.path);
+		let file_map: { [key: string]: string } = {};
+		for (let file of filelist) {
+			file_map[file.path] = await this.app.vault.cachedRead(file);
+		}
+		let file_contents: string[] = await Promise.all(filelist.map(async file => await this.app.vault.cachedRead(file)));
+		let linker_obj: plugin.JsLinker = new plugin.JsLinker(file_paths, file_contents);
+		let bad_parse_file_errors: string[] = linker_obj.get_bad_parse_files();
+
+		let byte_increament_map: { [key: string]: number } = {};
+		console.log('Getting Links, One Moment Please...');
+		let links: plugin.JsLink[] = linker_obj.get_links(this.settings.caseInsensitive, this.settings.linkToSelf);
+		for (let link of links) {
+			let slice_start = link.get_start();
+			let slice_end = link.get_end();
+			let source = link.get_source();
+			let target = link.get_target();
+			let link_text = link.get_link_text();
+			let link_len = link_text.length;
+			let content = file_map[source];
+
+			let encoder = new TextEncoder();
+			let decoder = new TextDecoder();
+			let byteArray = encoder.encode(content);
+
+			let content_as_bytes = encoder.encode(content);
+
+			let slicedArray = byteArray.slice(slice_start, slice_end);
+			let slice_str = decoder.decode(slicedArray);
+			let replace_str = `[[${target}|${link_text}]]`;
+
+			let replaced_as_bytes = encoder.encode(replace_str);
+			let increment = replaced_as_bytes.length - (slice_end - slice_start);
+
+			let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${link_text}]]` + decoder.decode(content_as_bytes.slice(slice_end));
+
+			let file_change: FileChange = {
+				file_path: source,
+				new_content: new_content
+			}
+
+			// create model with file_change
+			let modal = new ParseModal(this, file_change);
+			modal.open();
+
+
+
+			// MarkdownRenderer.renderMarkdown(new_content, divContainer, "", divContainer);
+
+		}
 	}
 
 	async loadSettings() {
@@ -65,60 +123,23 @@ export default class RustPlugin extends Plugin {
 
 class ParseModal extends Modal {
 	plugin: RustPlugin;
-	constructor(plugin: RustPlugin) {
+	change: FileChange;
+	constructor(plugin: RustPlugin, file_change: FileChange) {
 		super(plugin.app);
 		this.plugin = plugin;
+		this.change = file_change;
 	}
 
 	async onOpen() {
 
 		const { contentEl } = this;
-		console.log('Parsing files');
-		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
-		let file_paths: string[] = filelist.map(file => file.path);
-		let file_map: { [key: string]: string } = {};
-		for (let file of filelist) {
-			file_map[file.path] = await this.app.vault.cachedRead(file);
-		}
-		let file_contents: string[] = await Promise.all(filelist.map(async file => await this.app.vault.cachedRead(file)));
-		let linker_obj: plugin.JsLinker = new plugin.JsLinker(file_paths, file_contents);
-		let bad_parse_file_errors: string[] = linker_obj.get_bad_parse_files();
-		// for (let error of bad_parse_file_errors) {
-		// 	console.log(`${error}`);
-		// }
+		let new_content = this.change.new_content;
 
-
-		let links: plugin.JsLink[] = linker_obj.get_links(this.plugin.settings.caseInsensitive, this.plugin.settings.linkToSelf);
-
-		for (let link of links) {
-			console.log(`${link.debug()}`);
-			let slice_start = link.get_start();
-			let slice_end = link.get_end();
-			let source = link.get_source();
-			let link_text = link.get_link_text();
-			let link_len = link_text.length;
-			let content = file_map[source];
-
-			// let bound = slice_start + slice_end + 20;
-			// if (bound < slice_end) {
-			// 	slice_end = bound;
-			// }
-
-			// print content after the link
-			// let slice_str = content.slice(slice_start, slice_end);
-			let encoder = new TextEncoder();
-			let decoder = new TextDecoder();
-			let byteArray = encoder.encode(content);
-
-			let slicedArray = byteArray.slice(slice_start, slice_end);
-			let slice_str = decoder.decode(slicedArray);
-			console.log(`${slice_str}`);
-		}
-
-
-
-		let text = 'Hi there!';
-		contentEl.setText(text);
+		// new_content is a markdown string with the link inserted
+		// add a preview of the new content to contentEl
+		let divContainer = contentEl.createDiv();
+		divContainer.addClass('markdown-preview-view');
+		divContainer.innerHTML = new_content;
 	}
 
 	onClose() {
@@ -126,6 +147,7 @@ class ParseModal extends Modal {
 		contentEl.empty();
 	}
 }
+
 
 class RustPluginSettingTab extends PluginSettingTab {
 	plugin: RustPlugin;
@@ -157,53 +179,44 @@ class RustPluginSettingTab extends PluginSettingTab {
 	}
 }
 
-class TFileWrapper {
-	contents: string;
-	path: string;
-	name: string;
+// class TFileWrapper {
+// 	contents: string;
+// 	path: string;
+// 	name: string;
 
-	constructor(file: TFile) {
-		this.initialize(file);
-	}
+// 	constructor(file: TFile) {
+// 		this.initialize(file);
+// 	}
 
-	async initialize(file: TFile) {
-		this.contents = await file.vault.cachedRead(file);
-		this.path = file.path;
-		this.name = file.name;
-	}
+// 	async initialize(file: TFile) {
+// 		this.contents = await file.vault.cachedRead(file);
+// 		this.path = file.path;
+// 		this.name = file.name;
+// 	}
 
-	get_name() {
-		return this.name;
-	}
+// 	get_name() {
+// 		return this.name;
+// 	}
 
-	get_path() {
-		return this.path;
-	}
+// 	get_path() {
+// 		return this.path;
+// 	}
 
-	get_contents() {
-		return this.contents;
-	}
+// 	get_contents() {
+// 		return this.contents;
+// 	}
 
-	set_name(name: string) {
-		this.name = name;
-	}
+// 	set_name(name: string) {
+// 		this.name = name;
+// 	}
 
-	set_path(path: string) {
-		this.path = path;
-	}
+// 	set_path(path: string) {
+// 		this.path = path;
+// 	}
 
-	set_contents(contents: string) {
-		this.contents = contents;
-	}
-}
+// 	set_contents(contents: string) {
+// 		this.contents = contents;
+// 	}
+// }
 
-class PrinterObject {
-	constructor() {
-
-	}
-
-	print(str: string) {
-		console.log
-	}
-}
 

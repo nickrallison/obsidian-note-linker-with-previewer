@@ -138,21 +138,7 @@ impl JsLinker {
                     alias_map.insert(&md_file.path, aliases);
                 }
                 Err(e) => match e {
-                    _ => {} // Error::Generic(e) => {
-                            //     file_groups.insert(group_index, Err(Error::Generic(e.to_string())));
-                            // }
-                            // Error::IO(e) => {
-                            //     file_groups.insert(
-                            //         group_index,
-                            //         Err(Error::Generic(f!("IO Error: {}", e.to_string()))),
-                            //     );
-                            // }
-                            // Error::ParseError(path, _) => {
-                            //     file_groups.insert(
-                            //         group_index,
-                            //         Err(Error::Generic(f!("Parse Error: {}", path.display()))),
-                            //     );
-                            // }
+                    _ => {}
                 },
             }
         }
@@ -215,14 +201,10 @@ impl JsLinker {
                     let string_positions: Vec<crate::parser::StringPosition> =
                         md_file.get_string_nodes();
                     for string_pos in string_positions {
-                        // let row: u32 = string_pos.line;
-                        // let col: u32 = string_pos.column;
                         let start: u32 = string_pos.start;
                         let end: u32 = string_pos.end;
                         let node: &parser::Node = string_pos.string_node;
-                        // let entire_string = node.get_entire_string();
                         let string: Result<&str> = node.get_inner_string();
-
                         match string {
                             Ok(string) => {
                                 let caps: Option<regex::Captures> = regex.captures(string);
@@ -234,18 +216,13 @@ impl JsLinker {
                                         let cap_start = capture.start() as u32;
                                         let target: &Path =
                                             file_groups.get(&group_index).expect("expected group");
-
                                         let source: &Path = &md_file.path;
                                         let link_text: &str = capture_str;
                                         let link: JsLink = JsLink {
-                                            // debug: entire_string,
                                             source: source.to_string_lossy().to_string(),
                                             target: target.to_string_lossy().to_string(),
                                             link_text: link_text.to_string(),
-                                            // row: row,
-                                            // col: col,
                                             start: start + cap_start,
-                                            // start + link_text length
                                             end: start + cap_start + link_text.len() as u32,
                                         };
                                         links.push(link);
@@ -271,12 +248,9 @@ impl JsLinker {
 
 #[wasm_bindgen]
 pub struct JsLink {
-    // debug: String,
     source: String,
     target: String,
     link_text: String,
-    // row: u32,
-    // col: u32,
     start: u32,
     end: u32,
 }
@@ -294,10 +268,10 @@ impl JsLink {
     pub fn get_source(&self) -> JsString {
         JsString::from(self.source.clone())
     }
-    // #[wasm_bindgen(getter)]
-    // pub fn get_target(&self) -> JsString {
-    //     JsString::from(self.target.clone())
-    // }
+    #[wasm_bindgen]
+    pub fn get_target(&self) -> JsString {
+        JsString::from(self.target.clone())
+    }
     #[wasm_bindgen]
     pub fn get_link_text(&self) -> JsString {
         JsString::from(self.link_text.clone())
