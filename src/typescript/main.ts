@@ -98,12 +98,16 @@ export default class RustPlugin extends Plugin {
 				file_path: source,
 				new_content: new_content
 			}
+			console.log(link.debug());
 
 			// create model with file_change
 			let modal = new ParseModal(this, file_change);
 			modal.open();
 
+			await modal.wait_for_submit();
 
+			// modal does its this
+			// modal.close();
 
 			// MarkdownRenderer.renderMarkdown(new_content, divContainer, "", divContainer);
 
@@ -124,23 +128,43 @@ export default class RustPlugin extends Plugin {
 class ParseModal extends Modal {
 	plugin: RustPlugin;
 	change: FileChange;
+	submitted: boolean;
 	constructor(plugin: RustPlugin, file_change: FileChange) {
 		super(plugin.app);
 		this.plugin = plugin;
 		this.change = file_change;
+		this.submitted = false;
 	}
 
 	async onOpen() {
 
 		const { contentEl } = this;
-		let new_content = this.change.new_content;
 
-		// new_content is a markdown string with the link inserted
-		// add a preview of the new content to contentEl
-		let divContainer = contentEl.createDiv();
-		divContainer.addClass('markdown-preview-view');
-		divContainer.innerHTML = new_content;
+		await MarkdownRenderer.renderMarkdown(this.change.new_content, contentEl, "/", this.plugin);;
+
+		new Setting(contentEl)
+			.addButton((btn) =>
+				btn
+					.setButtonText("Submit")
+					.setCta()
+					.onClick(() => {
+
+						this.close();
+						this.submitted = true;
+					}));
+
 	}
+
+	onSubmit() {
+		console.log('Submitting');
+	}
+
+	async wait_for_submit() {
+		while (!this.submitted) {
+			await new Promise((resolve) => setTimeout(resolve, 100));
+		}
+	}
+
 
 	onClose() {
 		const { contentEl } = this;
