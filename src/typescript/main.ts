@@ -9,10 +9,12 @@ import { prependListener } from 'process';
 class RustPluginSettings {
 	caseInsensitive: boolean;
 	linkToSelf: boolean;
+	color: string;
 
-	constructor(caseInsensitive: boolean, linkToSelf: boolean) {
+	constructor(caseInsensitive: boolean, linkToSelf: boolean, color: string) {
 		this.caseInsensitive = caseInsensitive;
 		this.linkToSelf = linkToSelf;
+		this.color = color;
 	}
 	set_case_insensitive(caseSensitive: boolean) {
 		this.caseInsensitive = caseSensitive;
@@ -29,11 +31,12 @@ class RustPluginSettings {
 
 }
 
-const DEFAULT_SETTINGS: RustPluginSettings = new RustPluginSettings(true, false);
+const DEFAULT_SETTINGS: RustPluginSettings = new RustPluginSettings(true, false, "red");
 
 interface FileChange {
 	file_path: string;
 	new_content: string;
+	colored_content: string;
 }
 
 export default class RustPlugin extends Plugin {
@@ -53,6 +56,8 @@ export default class RustPlugin extends Plugin {
 				this.run_linker()
 			}
 		});
+
+		this.addSettingTab(new RustPluginSettingTab(this.app, this));
 	}
 
 	async run_linker() {
@@ -91,12 +96,15 @@ export default class RustPlugin extends Plugin {
 
 			let replaced_as_bytes = encoder.encode(replace_str);
 			let increment = replaced_as_bytes.length - (slice_end - slice_start);
-
+			let color = this.settings.color;
+			// <span style=color:#2ecc71>This is a test</span>  
+			let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${link_text}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
 			let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${link_text}]]` + decoder.decode(content_as_bytes.slice(slice_end));
 
 			let file_change: FileChange = {
 				file_path: source,
-				new_content: new_content
+				new_content: new_content,
+				colored_content: colored_content
 			}
 			console.log(link.debug());
 
@@ -105,6 +113,20 @@ export default class RustPlugin extends Plugin {
 			modal.open();
 
 			await modal.wait_for_submit();
+
+			if (modal.accepted) {
+				console.log('Accepted changes for ' + source);
+				let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
+				file_map[source] = new_content;
+				await this.app.vault.modify(tfile, new_content);
+				byte_increament_map[source] = increment;
+			}
+
+			if (modal.declined) {
+				console.log('Declined changes for ' + source);
+				// file_map[source] = new_content;
+				// byte_increament_map[source] = increment;
+			}
 
 			// modal does its this
 			// modal.close();
@@ -128,30 +150,45 @@ export default class RustPlugin extends Plugin {
 class ParseModal extends Modal {
 	plugin: RustPlugin;
 	change: FileChange;
-	submitted: boolean;
+
+	accepted: boolean;
+	declined: boolean;
+
 	constructor(plugin: RustPlugin, file_change: FileChange) {
 		super(plugin.app);
 		this.plugin = plugin;
 		this.change = file_change;
-		this.submitted = false;
+		this.accepted = false;
+		this.declined = false;
 	}
 
 	async onOpen() {
 
 		const { contentEl } = this;
 
-		await MarkdownRenderer.renderMarkdown(this.change.new_content, contentEl, "/", this.plugin);;
-
 		new Setting(contentEl)
 			.addButton((btn) =>
 				btn
-					.setButtonText("Submit")
+					.setButtonText("Accept")
 					.setCta()
 					.onClick(() => {
 
 						this.close();
-						this.submitted = true;
+						this.accepted = true;
 					}));
+
+		new Setting(contentEl)
+			.addButton((btn) =>
+				btn
+					.setButtonText("Decline")
+					.setCta()
+					.onClick(() => {
+
+						this.close();
+						this.declined = true;
+					}));
+
+		await MarkdownRenderer.renderMarkdown(this.change.colored_content, contentEl, "/", this.plugin);;
 
 	}
 
@@ -160,7 +197,7 @@ class ParseModal extends Modal {
 	}
 
 	async wait_for_submit() {
-		while (!this.submitted) {
+		while (!this.accepted && !this.declined) {
 			await new Promise((resolve) => setTimeout(resolve, 100));
 		}
 	}
@@ -189,17 +226,33 @@ class RustPluginSettingTab extends PluginSettingTab {
 		containerEl.createEl('h2', { text: 'Settings for my awesome plugin.' });
 
 
-		// new Setting(containerEl)
-		// 	.setName('Case Sensitive')
-		// 	.setDesc('Whether to use a case sensitive search whe linking files')
-		// 	.addText(text => text
-		// 		.setPlaceholder('Enter your secret')
-		// 		.setValue(this.plugin.settings.mySetting)
-		// 		.onChange(async (value) => {
-		// 			console.log('Secret: ' + value);
-		// 			this.plugin.settings.mySetting = value;
-		// 			await this.plugin.saveSettings();
-		// 		}));
+		new Setting(containerEl)
+			.setName('Case Insensitive')
+			.setDesc('Whether to use a case Insensitive search when linking files')
+			.addToggle(text => text
+				.setValue(this.plugin.settings.caseInsensitive)
+				.onChange(async (value) => {
+					this.plugin.settings.caseInsensitive = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Link to Self')
+			.setDesc('Whether to link to the same file')
+			.addToggle(text => text
+				.setValue(this.plugin.settings.linkToSelf)
+				.onChange(async (value) => {
+					this.plugin.settings.linkToSelf = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Color of Links')
+			.setDesc('Color to show links in the preview (no effect on the actual file), any supported CSS color is valid. Default is "red", but could also use hex: "#2ecc71".')
+			.addText(text => text
+				.setValue(this.plugin.settings.color)
+				.onChange(async (value) => {
+					this.plugin.settings.color = value;
+					await this.plugin.saveSettings();
+				}));
 	}
 }
 
