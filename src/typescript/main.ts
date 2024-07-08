@@ -171,7 +171,11 @@ export default class RustPlugin extends Plugin {
 					let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
 					file_map[source] = new_content;
 					await this.app.vault.modify(tfile, new_content);
-					byte_increament_map[source] = increment;
+					if (byte_increament_map[source]) {
+						byte_increament_map[source] += increment;
+					} else {
+						byte_increament_map[source] = increment;
+					}
 				}
 
 				if (modal.declined) {
