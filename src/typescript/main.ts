@@ -98,7 +98,10 @@ export default class RustPlugin extends Plugin {
 		console.log('Created File[] vec');
 		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, this.settings.linkToSelf, this.settings.color);
 		console.log('Created Settings Object');
-		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(file_paths, files, settings_obj);
+		let valid_file_paths: string[] = wasm_vault.get_valid_file_paths();
+		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
+		console.log('Got Valid Files');
+		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, settings_obj);
 		console.log('Created Link Finder');
 		// let filelist: TFile[] = this.app.vault.getMarkdownFiles();
 		// let file_paths: string[] = filelist.map(file => file.path);
@@ -113,16 +116,13 @@ export default class RustPlugin extends Plugin {
 		let byte_increament_map: { [key: string]: number } = {};
 		console.log('Getting Links, One Moment Please...');
 
-		// links is a map with files being keys and lists of links being values
-		let links: { [key: string]: plugin.JsLink[] } = {};
-		for (let file_path of file_paths) {
+		let valid_files_len = valid_files.length;
+		let valid_index = 1;
+		for (let file_path of valid_file_paths) {
 			let file: plugin.JsFile = wasm_vault.get_file(file_path);
-			let links_for_file: plugin.JsLink[] = link_finder.find_links(file);
-			links[file_path] = links_for_file;
-		}
-		for (let file_path of file_paths) {
-			let file_links = links[file_path];
-
+			let file_links: plugin.JsLink[] = link_finder.find_links(file);
+			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
+			valid_index++;
 
 			// let links: plugin.JsLink[] = linker_obj.get_links(this.settings.caseInsensitive, this.settings.linkToSelf);
 			for (let link of file_links) {

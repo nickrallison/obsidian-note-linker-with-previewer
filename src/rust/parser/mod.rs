@@ -711,7 +711,12 @@ pub struct StringLine {
 }
 
 fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<StringLine> {
-    debug_assert!(pair.as_rule() == Rule::string_line);
+    debug_assert!(
+        pair.as_rule() == Rule::string_line
+            || pair.as_rule() == Rule::bold_italic_node
+            || pair.as_rule() == Rule::bold_node
+            || pair.as_rule() == Rule::italic_node
+    );
 
     let mut nodes: Vec<Node> = Vec::new();
     for pair_inner in pair.into_inner() {

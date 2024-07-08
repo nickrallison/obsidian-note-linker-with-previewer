@@ -200,10 +200,10 @@ A Turing Machine is a theoretical computational device, conceived by British mat
 
 #[cfg(test)]
 pub mod link_finder_test {
+    use include_dir::{include_dir, Dir};
     use std::path::PathBuf;
 
     use super::*;
-    // use crate::link_finder::{FILE_1_PATH, FILE_2_PATH, FILE_1_CONT, FILE_2_CONT};
 
     #[test]
     fn regex_construct_test() {
@@ -306,5 +306,24 @@ pub mod link_finder_test {
             },
         ];
         assert_eq!(links, links_expected);
+    }
+    #[test]
+    fn link_finder_coverage_test() {
+        static PROJECT_DIR: Dir<'_> = include_dir!("test");
+        let settings = crate::settings::Settings::new(true, false, "red".to_string());
+        let mut files: Vec<Result<crate::vault::File>> = vec![];
+        for file in PROJECT_DIR.files() {
+            let path = file.path().to_path_buf();
+            let content = file.contents_utf8().unwrap().to_string();
+            files.push(crate::vault::File::new(path, content));
+        }
+        let mut valid_files: Vec<crate::vault::File> = vec![];
+        for file in files {
+            match file {
+                Ok(file) => valid_files.push(file),
+                Err(_) => (),
+            }
+        }
+        let link_finder = LinkFinder::new(valid_files.iter().collect(), settings);
     }
 }

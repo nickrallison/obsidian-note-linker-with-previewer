@@ -128,6 +128,15 @@ impl JsVault {
 
         JsFile { valid, file }
     }
+
+    #[wasm_bindgen]
+    pub fn get_valid_file_paths(&self) -> Vec<JsString> {
+        let file_paths: Vec<&PathBuf> = self.files.get_valid_file_paths();
+        file_paths
+            .iter()
+            .map(|path| JsString::from(format!("{}", path.display())))
+            .collect()
+    }
 }
 
 #[wasm_bindgen]
@@ -273,6 +282,10 @@ impl VaultWrapper {
 
     fn get_file(&self, file_path: PathBuf) -> Option<&crate::vault::File> {
         self.valid_files.get(&file_path)
+    }
+
+    fn get_valid_file_paths(&self) -> Vec<&PathBuf> {
+        self.valid_files.keys().collect()
     }
 }
 

@@ -14,13 +14,11 @@ js-sys = "0.3.49"
 pest = "2.6"
 pest_derive = "2.6"
 serde_yaml = "0.9.34"
-md_parser = { git = "https://github.com/nickrallison/md_parser.git" }
 getrandom = { version = "0.2", features = ["js"] }
-
 thiserror = "1"
 regex = "1.10.5"
-include_dir = "0.7.4"
 
 [dev-dependencies]
 anyhow = "1"
 wasm-bindgen-test = "0.3.0"
+include_dir = "0.7.4"
