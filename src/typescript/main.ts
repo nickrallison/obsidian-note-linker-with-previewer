@@ -86,11 +86,6 @@ export default class RustPlugin extends Plugin {
 			index++;
 		}
 
-		// pub fn new(
-		// 	file_paths: Vec<JsString>,
-		// 	files: Vec<JsFile>,
-		// 	settings: JsSettings,
-		// )
 		let files: plugin.JsFile[] = [];
 		for (let file_path of file_paths) {
 			files.push(wasm_vault.get_file(file_path));
@@ -103,15 +98,6 @@ export default class RustPlugin extends Plugin {
 		console.log('Got Valid Files');
 		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, settings_obj);
 		console.log('Created Link Finder');
-		// let filelist: TFile[] = this.app.vault.getMarkdownFiles();
-		// let file_paths: string[] = filelist.map(file => file.path);
-		// let file_map: { [key: string]: string } = {};
-		// for (let file of filelist) {
-		// 	file_map[file.path] = await this.app.vault.cachedRead(file);
-		// }
-		// let file_contents: string[] = await Promise.all(filelist.map(async file => await this.app.vault.cachedRead(file)));
-		// let linker_obj: plugin.JsLinker = new plugin.JsLinker(file_paths, file_contents);
-		// let bad_parse_file_errors: string[] = linker_obj.get_bad_parse_files();
 
 		let byte_increament_map: { [key: string]: number } = {};
 		console.log('Getting Links, One Moment Please...');
@@ -124,7 +110,6 @@ export default class RustPlugin extends Plugin {
 			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
 			valid_index++;
 
-			// let links: plugin.JsLink[] = linker_obj.get_links(this.settings.caseInsensitive, this.settings.linkToSelf);
 			for (let link of file_links) {
 				let file_increment: number = 0;
 				if (byte_increament_map[file_path]) {
@@ -160,7 +145,6 @@ export default class RustPlugin extends Plugin {
 					new_content: new_content,
 					colored_content: colored_content
 				}
-				// create model with file_change
 				let modal = new ParseModal(this, file_change);
 				modal.open();
 
@@ -180,16 +164,9 @@ export default class RustPlugin extends Plugin {
 
 				if (modal.declined) {
 					console.log('Declined changes for ' + source);
-					// file_map[source] = new_content;
-					// byte_increament_map[source] = increment;
+
 				}
 			}
-			// modal does its this
-			// modal.close();
-
-			// MarkdownRenderer.renderMarkdown(new_content, divContainer, "", divContainer);
-
-
 		}
 	}
 
