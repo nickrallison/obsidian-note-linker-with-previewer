@@ -44,7 +44,7 @@ export default class RustPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
-
+		// Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module.
 		const buffer = Buffer.from(rustPlugin, 'base64')
 		await plugin.default(Promise.resolve(buffer));
 		plugin.onload(this);
@@ -61,79 +61,124 @@ export default class RustPlugin extends Plugin {
 	}
 
 	async run_linker() {
-		console.log('Parsing Files');
+		console.log('Parsing Files 1');
+		let settings = new plugin.JsSettings(this.settings.caseInsensitive, this.settings.linkToSelf, this.settings.color);
+		console.log('Settings Created');
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
+		console.log('Files Found');
 		let file_paths: string[] = filelist.map(file => file.path);
+		console.log('Files Mapped');
+
 		let file_map: { [key: string]: string } = {};
 		for (let file of filelist) {
 			file_map[file.path] = await this.app.vault.cachedRead(file);
+			console.log('Read ' + file.path);
 		}
-		let file_contents: string[] = await Promise.all(filelist.map(async file => await this.app.vault.cachedRead(file)));
-		let linker_obj: plugin.JsLinker = new plugin.JsLinker(file_paths, file_contents);
-		let bad_parse_file_errors: string[] = linker_obj.get_bad_parse_files();
+		console.log('Files Read');
+		let wasm_vault: plugin.JsVault = plugin.JsVault.default();
+		console.log('Vault Created')
+
+		let total_files = filelist.length;
+		let index = 1;
+		for (let file of filelist) {
+			console.log(`(${index} / ${total_files}) Parsing ` + file.path);
+			wasm_vault.add_file(file.path, file_map[file.path]);
+			index++;
+		}
+
+		// pub fn new(
+		// 	file_paths: Vec<JsString>,
+		// 	files: Vec<JsFile>,
+		// 	settings: JsSettings,
+		// )
+		let files: plugin.JsFile[] = [];
+		for (let file_path of file_paths) {
+			files.push(wasm_vault.get_file(file_path));
+		}
+		console.log('Created File[] vec');
+		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, this.settings.linkToSelf, this.settings.color);
+		console.log('Created Settings Object');
+		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(file_paths, files, settings_obj);
+		console.log('Created Link Finder');
+		// let filelist: TFile[] = this.app.vault.getMarkdownFiles();
+		// let file_paths: string[] = filelist.map(file => file.path);
+		// let file_map: { [key: string]: string } = {};
+		// for (let file of filelist) {
+		// 	file_map[file.path] = await this.app.vault.cachedRead(file);
+		// }
+		// let file_contents: string[] = await Promise.all(filelist.map(async file => await this.app.vault.cachedRead(file)));
+		// let linker_obj: plugin.JsLinker = new plugin.JsLinker(file_paths, file_contents);
+		// let bad_parse_file_errors: string[] = linker_obj.get_bad_parse_files();
 
 		let byte_increament_map: { [key: string]: number } = {};
 		console.log('Getting Links, One Moment Please...');
-		let links: plugin.JsLink[] = linker_obj.get_links(this.settings.caseInsensitive, this.settings.linkToSelf);
-		for (let link of links) {
-			let slice_start = link.get_start();
-			let slice_end = link.get_end();
-			let source = link.get_source();
-			let target = link.get_target();
-			let link_text = link.get_link_text();
-			let link_len = link_text.length;
-			let content = file_map[source];
 
-			let encoder = new TextEncoder();
-			let decoder = new TextDecoder();
-			let byteArray = encoder.encode(content);
-
-			let content_as_bytes = encoder.encode(content);
-
-			let slicedArray = byteArray.slice(slice_start, slice_end);
-			let slice_str = decoder.decode(slicedArray);
-			let replace_str = `[[${target}|${link_text}]]`;
-
-			let replaced_as_bytes = encoder.encode(replace_str);
-			let increment = replaced_as_bytes.length - (slice_end - slice_start);
-			let color = this.settings.color;
-			// <span style=color:#2ecc71>This is a test</span>  
-			let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${link_text}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
-			let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${link_text}]]` + decoder.decode(content_as_bytes.slice(slice_end));
-
-			let file_change: FileChange = {
-				file_path: source,
-				new_content: new_content,
-				colored_content: colored_content
-			}
-			console.log(link.debug());
-
-			// create model with file_change
-			let modal = new ParseModal(this, file_change);
-			modal.open();
-
-			await modal.wait_for_submit();
-
-			if (modal.accepted) {
-				console.log('Accepted changes for ' + source);
-				let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
-				file_map[source] = new_content;
-				await this.app.vault.modify(tfile, new_content);
-				byte_increament_map[source] = increment;
-			}
-
-			if (modal.declined) {
-				console.log('Declined changes for ' + source);
-				// file_map[source] = new_content;
-				// byte_increament_map[source] = increment;
-			}
-
-			// modal does its this
-			// modal.close();
-
-			// MarkdownRenderer.renderMarkdown(new_content, divContainer, "", divContainer);
-
+		// links is a map with files being keys and lists of links being values
+		let links: { [key: string]: plugin.JsLink[] } = {};
+		for (let file_path of file_paths) {
+			let file: plugin.JsFile = wasm_vault.get_file(file_path);
+			let links_for_file: plugin.JsLink[] = link_finder.find_links(file);
 		}
+		// let links: plugin.JsLink[] = linker_obj.get_links(this.settings.caseInsensitive, this.settings.linkToSelf);
+		// for (let link of links) {
+		// 	let slice_start = link.get_start();
+		// 	let slice_end = link.get_end();
+		// 	let source = link.get_source();
+		// 	let target = link.get_target();
+		// 	let link_text = link.get_link_text();
+		// 	let link_len = link_text.length;
+		// 	let content = file_map[source];
+
+		// 	let encoder = new TextEncoder();
+		// 	let decoder = new TextDecoder();
+		// 	let byteArray = encoder.encode(content);
+
+		// 	let content_as_bytes = encoder.encode(content);
+
+		// 	let slicedArray = byteArray.slice(slice_start, slice_end);
+		// 	let slice_str = decoder.decode(slicedArray);
+		// 	let replace_str = `[[${target}|${link_text}]]`;
+
+		// 	let replaced_as_bytes = encoder.encode(replace_str);
+		// 	let increment = replaced_as_bytes.length - (slice_end - slice_start);
+		// 	let color = this.settings.color;
+		// 	// <span style=color:#2ecc71>This is a test</span>  
+		// 	let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${link_text}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
+		// 	let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${link_text}]]` + decoder.decode(content_as_bytes.slice(slice_end));
+
+		// 	let file_change: FileChange = {
+		// 		file_path: source,
+		// 		new_content: new_content,
+		// 		colored_content: colored_content
+		// 	}
+		// 	console.log(link.debug());
+
+		// 	// create model with file_change
+		// 	let modal = new ParseModal(this, file_change);
+		// 	modal.open();
+
+		// 	await modal.wait_for_submit();
+
+		// 	if (modal.accepted) {
+		// 		console.log('Accepted changes for ' + source);
+		// 		let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
+		// 		file_map[source] = new_content;
+		// 		await this.app.vault.modify(tfile, new_content);
+		// 		byte_increament_map[source] = increment;
+		// 	}
+
+		// 	if (modal.declined) {
+		// 		console.log('Declined changes for ' + source);
+		// 		// file_map[source] = new_content;
+		// 		// byte_increament_map[source] = increment;
+		// 	}
+
+		// modal does its this
+		// modal.close();
+
+		// MarkdownRenderer.renderMarkdown(new_content, divContainer, "", divContainer);
+
+
 	}
 
 	async loadSettings() {

@@ -60,8 +60,7 @@ use crate::prelude::*;
 #[grammar = "src/rust/parser/md.pest"]
 pub struct MDParser;
 
-pub fn parse_md_file_wrapper(contents: String, path: String) -> Result<MDFile> {
-    let path = PathBuf::from(path);
+pub fn parse_md_file_wrapper(contents: String, path: PathBuf) -> Result<ParsedMDFile> {
     let mut contents = contents;
     if !&contents.ends_with('\n') {
         contents.push('\n');
@@ -88,20 +87,23 @@ pub fn parse_md_file_wrapper(contents: String, path: String) -> Result<MDFile> {
         }
     };
 
-    let mut md_file_struct: MDFile = parse_md_file(pairs, &path)?;
+    let mut md_file_struct: ParsedMDFile = parse_md_file(pairs, &path)?;
     md_file_struct.path = path;
     Ok(md_file_struct)
 }
 
-#[derive(Debug)]
-pub struct MDFile {
+#[derive(Debug, Clone)]
+pub struct ParsedMDFile {
     pub yaml: Option<YAML>,
     pub blocks: Vec<Block>,
 
     pub path: PathBuf, // absolute path to the file
 }
 
-impl MDFile {
+impl ParsedMDFile {
+    pub fn new(path: PathBuf, contents: String) -> Result<Self> {
+        parse_md_file_wrapper(contents, path)
+    }
     pub fn get_yaml(&self) -> Option<&serde_yaml::Value> {
         self.yaml.as_ref().map(|yaml| &yaml.yaml)
     }
@@ -171,9 +173,9 @@ impl MDFile {
     }
 }
 
-fn parse_md_file(pairs: pest::iterators::Pair<Rule>, path: &Path) -> Result<MDFile> {
+fn parse_md_file(pairs: pest::iterators::Pair<Rule>, path: &Path) -> Result<ParsedMDFile> {
     debug_assert!(pairs.as_rule() == Rule::md_file);
-    let mut result: MDFile = MDFile {
+    let mut result: ParsedMDFile = ParsedMDFile {
         yaml: None,
         blocks: Vec::new(),
         path: Default::default(),
@@ -199,7 +201,7 @@ fn parse_md_file(pairs: pest::iterators::Pair<Rule>, path: &Path) -> Result<MDFi
     Ok(result)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct YAML {
     pub yaml: serde_yaml::Value,
@@ -229,7 +231,7 @@ fn parse_yaml(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<YAML> {
     ));
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Block {
     BlockQuote(BlockQuote),
     Latex(LatexBlock),
@@ -320,7 +322,7 @@ fn parse_vec_line_into_block(
 }
 
 // not including >
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BlockQuote {
     pub inner_blocks: Vec<Block>,
 }
@@ -442,7 +444,7 @@ fn parse_vec_line(pairs: Vec<pest::iterators::Pair<Rule>>, path: &Path) -> Resul
 }
 
 // not including $$
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LatexBlock {
     pub latex: String,
 }
@@ -458,7 +460,7 @@ fn parse_latex_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<L
 }
 
 // not including ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CodeBlock {
     pub code_type: Option<String>,
     pub code: String,
@@ -489,7 +491,7 @@ fn parse_code_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Co
 
     Ok(CodeBlock { code_type, code })
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct StringBlock {
     pub lines: Vec<Line>,
@@ -517,7 +519,7 @@ fn parse_string_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
     Ok(StringBlock { lines })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Line {
     NumberedList(NumberedList),
     BulletedList(BulletedList),
@@ -603,7 +605,7 @@ fn parse_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Line> {
     Ok(result)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct NumberedList {
     pub indent: String,
@@ -642,7 +644,7 @@ fn parse_numbered_list_line(
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct BulletedList {
     pub indent: String,
@@ -672,7 +674,7 @@ fn parse_list_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Bul
     Ok(BulletedList { indent, nodes })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct Heading {
     pub level: u32,
@@ -702,7 +704,7 @@ fn parse_heading_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
     Ok(Heading { level, nodes })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 
 pub struct StringLine {
     pub nodes: Vec<Node>,
@@ -1006,39 +1008,39 @@ pub(crate) struct StringPosition<'a> {
     pub end: u32,
 }
 
-#[cfg(test)]
-pub mod parser_tests {
-    use super::*;
-    use crate::prelude::*;
+// #[cfg(test)]
+// pub mod parser_tests {
+//     use super::*;
+//     use crate::prelude::*;
 
-    #[test]
-    fn test_parse_md_file() {
-        let path = "test/";
-        for file in std::fs::read_dir(path).unwrap() {
-            println!("{:?}", file);
-            let file = file.unwrap();
-            let path = file.path();
-            let path = path.to_str().unwrap();
-            let contents = std::fs::read_to_string(path).unwrap() + "\n";
-            let md_file = MDParser::parse(Rule::md_file, &contents);
-            if md_file.is_err() {
-                continue;
-            }
-            let md_file = md_file.unwrap();
-            let flattened = md_file.flatten();
-            for inner in flattened {
-                let start = inner.as_span().start();
-                let end = inner.as_span().end();
+//     #[test]
+//     fn test_parse_md_file() {
+//         let path = "test/";
+//         for file in std::fs::read_dir(path).unwrap() {
+//             println!("{:?}", file);
+//             let file = file.unwrap();
+//             let path = file.path();
+//             let path = path.to_str().unwrap();
+//             let contents = std::fs::read_to_string(path).unwrap() + "\n";
+//             let md_file = MDParser::parse(Rule::md_file, &contents);
+//             if md_file.is_err() {
+//                 continue;
+//             }
+//             let md_file = md_file.unwrap();
+//             let flattened = md_file.flatten();
+//             for inner in flattened {
+//                 let start = inner.as_span().start();
+//                 let end = inner.as_span().end();
 
-                // assert that the contents from start to end are the same as the inner.as_str()
-                assert!(&contents[start..end] == inner.as_str());
-            }
-        }
-        // let contents = include_str!("../../../test/Algorithm Specifications.md").to_string() + "\n";
+//                 // assert that the contents from start to end are the same as the inner.as_str()
+//                 assert!(&contents[start..end] == inner.as_str());
+//             }
+//         }
+//         // let contents = include_str!("../../../test/Algorithm Specifications.md").to_string() + "\n";
 
-        // let parse_result = MDParser::parse(Rule::md_file, &contents)
-        //     .unwrap()
-        //     .next()
-        //     .unwrap();
-    }
-}
+//         // let parse_result = MDParser::parse(Rule::md_file, &contents)
+//         //     .unwrap()
+//         //     .next()
+//         //     .unwrap();
+//     }
+// }

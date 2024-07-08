@@ -10,6 +10,9 @@ pub enum Error {
     #[error(transparent)]
     IO(#[from] std::io::Error),
 
+    #[error(transparent)]
+    Regex(#[from] regex::Error),
+
     #[error("parse failure on file: {}", .0.display())]
     ParseError(PathBuf, String),
 }
