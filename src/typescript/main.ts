@@ -118,67 +118,75 @@ export default class RustPlugin extends Plugin {
 		for (let file_path of file_paths) {
 			let file: plugin.JsFile = wasm_vault.get_file(file_path);
 			let links_for_file: plugin.JsLink[] = link_finder.find_links(file);
+			links[file_path] = links_for_file;
 		}
-		// let links: plugin.JsLink[] = linker_obj.get_links(this.settings.caseInsensitive, this.settings.linkToSelf);
-		// for (let link of links) {
-		// 	let slice_start = link.get_start();
-		// 	let slice_end = link.get_end();
-		// 	let source = link.get_source();
-		// 	let target = link.get_target();
-		// 	let link_text = link.get_link_text();
-		// 	let link_len = link_text.length;
-		// 	let content = file_map[source];
-
-		// 	let encoder = new TextEncoder();
-		// 	let decoder = new TextDecoder();
-		// 	let byteArray = encoder.encode(content);
-
-		// 	let content_as_bytes = encoder.encode(content);
-
-		// 	let slicedArray = byteArray.slice(slice_start, slice_end);
-		// 	let slice_str = decoder.decode(slicedArray);
-		// 	let replace_str = `[[${target}|${link_text}]]`;
-
-		// 	let replaced_as_bytes = encoder.encode(replace_str);
-		// 	let increment = replaced_as_bytes.length - (slice_end - slice_start);
-		// 	let color = this.settings.color;
-		// 	// <span style=color:#2ecc71>This is a test</span>  
-		// 	let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${link_text}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
-		// 	let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${link_text}]]` + decoder.decode(content_as_bytes.slice(slice_end));
-
-		// 	let file_change: FileChange = {
-		// 		file_path: source,
-		// 		new_content: new_content,
-		// 		colored_content: colored_content
-		// 	}
-		// 	console.log(link.debug());
-
-		// 	// create model with file_change
-		// 	let modal = new ParseModal(this, file_change);
-		// 	modal.open();
-
-		// 	await modal.wait_for_submit();
-
-		// 	if (modal.accepted) {
-		// 		console.log('Accepted changes for ' + source);
-		// 		let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
-		// 		file_map[source] = new_content;
-		// 		await this.app.vault.modify(tfile, new_content);
-		// 		byte_increament_map[source] = increment;
-		// 	}
-
-		// 	if (modal.declined) {
-		// 		console.log('Declined changes for ' + source);
-		// 		// file_map[source] = new_content;
-		// 		// byte_increament_map[source] = increment;
-		// 	}
-
-		// modal does its this
-		// modal.close();
-
-		// MarkdownRenderer.renderMarkdown(new_content, divContainer, "", divContainer);
+		for (let file_path of file_paths) {
+			let file_links = links[file_path];
 
 
+			// let links: plugin.JsLink[] = linker_obj.get_links(this.settings.caseInsensitive, this.settings.linkToSelf);
+			for (let link of file_links) {
+				let file_increment: number = 0;
+				if (byte_increament_map[file_path]) {
+					file_increment = byte_increament_map[file_path];
+				}
+				let slice_start = file_increment + link.get_start();
+				let slice_end = file_increment + link.get_end();
+				console.log('Link Found: ' + (file_increment + slice_start) + ' ' + (file_increment + slice_end));
+				let source = link.get_source();
+				let target = link.get_target();
+				let content = file_map[source];
+
+				let encoder = new TextEncoder();
+				let decoder = new TextDecoder();
+				let byteArray = encoder.encode(content);
+
+				let content_as_bytes = encoder.encode(content);
+
+
+				let slicedArray = byteArray.slice(slice_start, slice_end);
+				let slice_str = decoder.decode(slicedArray);
+				let replace_str = `[[${target}|${slice_str}]]`;
+
+				let replaced_as_bytes = encoder.encode(replace_str);
+				let increment = replaced_as_bytes.length - (slice_end - slice_start);
+				let color = this.settings.color;
+				// <span style=color:#2ecc71>This is a test</span>  
+				let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${slice_str}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
+				let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${slice_str}]]` + decoder.decode(content_as_bytes.slice(slice_end));
+
+				let file_change: FileChange = {
+					file_path: source,
+					new_content: new_content,
+					colored_content: colored_content
+				}
+				// create model with file_change
+				let modal = new ParseModal(this, file_change);
+				modal.open();
+
+				await modal.wait_for_submit();
+
+				if (modal.accepted) {
+					console.log('Accepted changes for ' + source);
+					let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
+					file_map[source] = new_content;
+					await this.app.vault.modify(tfile, new_content);
+					byte_increament_map[source] = increment;
+				}
+
+				if (modal.declined) {
+					console.log('Declined changes for ' + source);
+					// file_map[source] = new_content;
+					// byte_increament_map[source] = increment;
+				}
+			}
+			// modal does its this
+			// modal.close();
+
+			// MarkdownRenderer.renderMarkdown(new_content, divContainer, "", divContainer);
+
+
+		}
 	}
 
 	async loadSettings() {

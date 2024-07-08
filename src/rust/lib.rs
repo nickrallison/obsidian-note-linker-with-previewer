@@ -223,6 +223,26 @@ pub struct JsLink {
     link: link_finder::Link,
 }
 
+#[wasm_bindgen]
+impl JsLink {
+    #[wasm_bindgen]
+    pub fn get_source(&self) -> JsString {
+        JsString::from(format!("{}", self.link.source.display()))
+    }
+    #[wasm_bindgen]
+    pub fn get_target(&self) -> JsString {
+        JsString::from(format!("{}", self.link.target.display()))
+    }
+    #[wasm_bindgen]
+    pub fn get_start(&self) -> JsValue {
+        self.link.byte_start.into()
+    }
+    #[wasm_bindgen]
+    pub fn get_end(&self) -> JsValue {
+        self.link.byte_end.into()
+    }
+}
+
 // Interface Types
 pub struct VaultWrapper {
     valid_files: HashMap<PathBuf, crate::vault::File>,
