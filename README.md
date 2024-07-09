@@ -29,5 +29,6 @@ yarn run dev
     - Non-Blocking search, so it keeps going in background
     - Completely Background search
 - Organization
-	- Add CI Build
+	- Update Plugin name and description
+ 	- Add CI Build
     - Add Nix Flake to build more easily 
