@@ -24,9 +24,10 @@ yarn run dev
 
 ### Todo
 
+- Performance
+    - Serde and Selectively Searching based on last modified metadata
+    - Non-Blocking search, so it keeps going in background
+    - Completely Background search
 - Organization
 	- Add CI Build
- 	- Add Tests
-    - Refactor Rust to be more modular
-    	- Get Imports / Functions Working more Easily
-     - Add Nix Flake to build more easily 
+    - Add Nix Flake to build more easily 
