@@ -1,11 +1,11 @@
 {
-	"id": "obsidian-sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-note-linker-with-previewer",
+	"name": "Note Linker with Previewer",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "This is a sample plugin for Obsidian. This plugin demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "This is a note linker plugin that includes a markdown parser to only link valid note sections and a previewer to view any changes before accepting them.",
+	"author": "Nick Allison",
+	"authorUrl": "https://github.com/nickrallison",
+	"fundingUrl": "https://github.com/sponsors/nickrallison",
 	"isDesktopOnly": false
 }

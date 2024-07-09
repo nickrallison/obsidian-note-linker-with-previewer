@@ -1,8 +1,7 @@
 import { App, Component, Editor, MarkdownRenderer, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, Vault } from 'obsidian';
 
-import rustPlugin from "../../pkg/obsidian_linker_plugin_bg.wasm";
-import * as plugin from "../../pkg/obsidian_linker_plugin.js";
-import { prependListener } from 'process';
+import rustPlugin from "../../pkg/obsidian_note_linker_with_previewer_bg.wasm";
+import * as plugin from "../../pkg/obsidian_note_linker_with_previewer.js";
 
 // Remember to rename these classes and interfaces!
 
@@ -50,10 +49,18 @@ export default class RustPlugin extends Plugin {
 		plugin.onload(this);
 
 		this.addCommand({
-			id: "parse",
-			name: "Parse",
+			id: "link_vault",
+			name: "Link Vault",
 			callback: () => {
 				this.run_linker()
+			}
+		});
+
+		this.addCommand({
+			id: "list config",
+			name: "List Config",
+			callback: () => {
+				this.list_config()
 			}
 		});
 
@@ -108,6 +115,7 @@ export default class RustPlugin extends Plugin {
 			let file: plugin.JsFile = wasm_vault.get_file(file_path);
 			let file_links: plugin.JsLink[] = link_finder.find_links(file);
 			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
+			new Notice(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
 			valid_index++;
 
 			for (let link of file_links) {
@@ -168,6 +176,12 @@ export default class RustPlugin extends Plugin {
 				}
 			}
 		}
+	}
+
+	async list_config() {
+		let config_dir: string = this.app.vault.configDir + '/plugins';
+		let config_files = await this.app.vault.adapter.list(config_dir);
+		console.log(config_files);
 	}
 
 	async loadSettings() {
@@ -289,45 +303,3 @@ class RustPluginSettingTab extends PluginSettingTab {
 				}));
 	}
 }
-
-// class TFileWrapper {
-// 	contents: string;
-// 	path: string;
-// 	name: string;
-
-// 	constructor(file: TFile) {
-// 		this.initialize(file);
-// 	}
-
-// 	async initialize(file: TFile) {
-// 		this.contents = await file.vault.cachedRead(file);
-// 		this.path = file.path;
-// 		this.name = file.name;
-// 	}
-
-// 	get_name() {
-// 		return this.name;
-// 	}
-
-// 	get_path() {
-// 		return this.path;
-// 	}
-
-// 	get_contents() {
-// 		return this.contents;
-// 	}
-
-// 	set_name(name: string) {
-// 		this.name = name;
-// 	}
-
-// 	set_path(path: string) {
-// 		this.path = path;
-// 	}
-
-// 	set_contents(contents: string) {
-// 		this.contents = contents;
-// 	}
-// }
-
-

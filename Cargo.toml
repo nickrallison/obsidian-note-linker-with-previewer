@@ -1,5 +1,5 @@
 [package]
-name = "obsidian-linker-plugin"
+name = "obsidian-note-linker-with-previewer"
 version = "0.1.0"
 authors = ["Nick Allison <nick@allisontech.ca>"]
 edition = "2018"
