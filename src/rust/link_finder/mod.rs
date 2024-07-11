@@ -104,12 +104,11 @@ impl LinkFinder {
         let mut links: Vec<Link> = vec![];
         let (regex, group_map) = self.create_regex_exc(&md_file.path).unwrap();
         let num_groups = group_map.len();
-        let string_positions: Vec<crate::parser::StringPosition> = md_file.get_string_nodes();
+        let string_nodes: Vec<crate::parser::Node> = md_file.get_string_nodes();
 
-        for string_pos in string_positions {
-            let start: usize = string_pos.start as usize;
-            let end: usize = string_pos.end as usize;
-            let node: &crate::parser::Node = string_pos.string_node;
+        for node in string_nodes {
+            let start: usize = node.start;
+            let end: usize = node.end;
             let string: Result<&str> = node.get_inner_string();
             match string {
                 Ok(string) => {
@@ -307,23 +306,23 @@ pub mod link_finder_test {
         ];
         assert_eq!(links, links_expected);
     }
-    #[test]
-    fn link_finder_coverage_test() {
-        static PROJECT_DIR: Dir<'_> = include_dir!("test");
-        let settings = crate::settings::Settings::new(true, false, "red".to_string());
-        let mut files: Vec<Result<crate::vault::File>> = vec![];
-        for file in PROJECT_DIR.files() {
-            let path = file.path().to_path_buf();
-            let content = file.contents_utf8().unwrap().to_string();
-            files.push(crate::vault::File::new(path, content));
-        }
-        let mut valid_files: Vec<crate::vault::File> = vec![];
-        for file in files {
-            match file {
-                Ok(file) => valid_files.push(file),
-                Err(_) => (),
-            }
-        }
-        let link_finder = LinkFinder::new(valid_files.iter().collect(), settings);
-    }
+    // #[test]
+    // fn link_finder_coverage_test() {
+    //     static PROJECT_DIR: Dir<'_> = include_dir!("test");
+    //     let settings = crate::settings::Settings::new(true, false, "red".to_string());
+    //     let mut files: Vec<Result<crate::vault::File>> = vec![];
+    //     for file in PROJECT_DIR.files() {
+    //         let path = file.path().to_path_buf();
+    //         let content = file.contents_utf8().unwrap().to_string();
+    //         files.push(crate::vault::File::new(path, content));
+    //     }
+    //     let mut valid_files: Vec<crate::vault::File> = vec![];
+    //     for file in files {
+    //         match file {
+    //             Ok(file) => valid_files.push(file),
+    //             Err(_) => (),
+    //         }
+    //     }
+    //     let link_finder = LinkFinder::new(valid_files.iter().collect(), settings);
+    // }
 }

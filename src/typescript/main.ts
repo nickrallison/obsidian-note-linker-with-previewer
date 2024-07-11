@@ -179,7 +179,7 @@ export default class RustPlugin extends Plugin {
 	}
 
 	async list_config() {
-		let config_dir: string = this.app.vault.configDir + '/plugins';
+		let config_dir: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer';
 		let config_files = await this.app.vault.adapter.list(config_dir);
 		console.log(config_files);
 	}

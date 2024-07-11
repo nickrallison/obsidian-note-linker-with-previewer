@@ -7,6 +7,7 @@ use std::{
 
 use pest::Parser;
 use pest_derive::Parser;
+use serde::{Deserialize, Serialize};
 
 /*
 Grammar:
@@ -92,7 +93,7 @@ pub fn parse_md_file_wrapper(contents: String, path: PathBuf) -> Result<ParsedMD
     Ok(md_file_struct)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedMDFile {
     pub yaml: Option<YAML>,
     pub blocks: Vec<Block>,
@@ -162,8 +163,8 @@ impl ParsedMDFile {
         Ok(aliases)
     }
 
-    pub fn get_string_nodes(&self) -> Vec<StringPosition> {
-        let mut nodes: Vec<StringPosition> = Vec::new();
+    pub fn get_string_nodes(&self) -> Vec<Node> {
+        let mut nodes: Vec<Node> = Vec::new();
         for block in &self.blocks {
             for node in block.get_string_nodes() {
                 nodes.push(node);
@@ -201,7 +202,7 @@ fn parse_md_file(pairs: pest::iterators::Pair<Rule>, path: &Path) -> Result<Pars
     Ok(result)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct YAML {
     pub yaml: serde_yaml::Value,
@@ -231,7 +232,7 @@ fn parse_yaml(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<YAML> {
     ));
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Block {
     BlockQuote(BlockQuote),
     Latex(LatexBlock),
@@ -240,8 +241,8 @@ pub enum Block {
 }
 
 impl Block {
-    pub fn get_string_nodes(&self) -> Vec<StringPosition> {
-        let mut nodes: Vec<StringPosition> = Vec::new();
+    pub fn get_string_nodes(&self) -> Vec<Node> {
+        let mut nodes: Vec<Node> = Vec::new();
         match self {
             Block::BlockQuote(block_quote) => {
                 for block in &block_quote.inner_blocks {
@@ -322,7 +323,7 @@ fn parse_vec_line_into_block(
 }
 
 // not including >
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockQuote {
     pub inner_blocks: Vec<Block>,
 }
@@ -444,7 +445,7 @@ fn parse_vec_line(pairs: Vec<pest::iterators::Pair<Rule>>, path: &Path) -> Resul
 }
 
 // not including $$
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LatexBlock {
     pub latex: String,
 }
@@ -460,7 +461,7 @@ fn parse_latex_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<L
 }
 
 // not including ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeBlock {
     pub code_type: Option<String>,
     pub code: String,
@@ -491,7 +492,7 @@ fn parse_code_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Co
 
     Ok(CodeBlock { code_type, code })
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct StringBlock {
     pub lines: Vec<Line>,
@@ -519,7 +520,7 @@ fn parse_string_block(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
     Ok(StringBlock { lines })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Line {
     NumberedList(NumberedList),
     BulletedList(BulletedList),
@@ -528,10 +529,10 @@ pub enum Line {
 }
 
 impl Line {
-    pub fn get_string_nodes(&self) -> Vec<StringPosition> {
+    pub fn get_string_nodes(&self) -> Vec<Node> {
         match self {
             Line::NumberedList(numbered_list) => {
-                let mut nodes: Vec<StringPosition> = Vec::new();
+                let mut nodes: Vec<Node> = Vec::new();
                 for node in &numbered_list.nodes {
                     let inner_nodes = node.get_string_node();
                     for node in inner_nodes {
@@ -541,7 +542,7 @@ impl Line {
                 nodes
             }
             Line::BulletedList(bulleted_list) => {
-                let mut nodes: Vec<StringPosition> = Vec::new();
+                let mut nodes: Vec<Node> = Vec::new();
                 for node in &bulleted_list.nodes {
                     let inner_nodes = node.get_string_node();
                     for node in inner_nodes {
@@ -551,7 +552,7 @@ impl Line {
                 nodes
             }
             Line::Heading(heading) => {
-                let mut nodes: Vec<StringPosition> = Vec::new();
+                let mut nodes: Vec<Node> = Vec::new();
                 for node in &heading.nodes {
                     let inner_nodes = node.get_string_node();
                     for node in inner_nodes {
@@ -561,7 +562,7 @@ impl Line {
                 nodes
             }
             Line::StringLine(string_line) => {
-                let mut nodes: Vec<StringPosition> = Vec::new();
+                let mut nodes: Vec<Node> = Vec::new();
                 for node in &string_line.nodes {
                     let inner_nodes = node.get_string_node();
                     for node in inner_nodes {
@@ -605,7 +606,7 @@ fn parse_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Line> {
     Ok(result)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct NumberedList {
     pub indent: String,
@@ -644,7 +645,7 @@ fn parse_numbered_list_line(
     })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct BulletedList {
     pub indent: String,
@@ -674,7 +675,7 @@ fn parse_list_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<Bul
     Ok(BulletedList { indent, nodes })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct Heading {
     pub level: u32,
@@ -704,7 +705,7 @@ fn parse_heading_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
     Ok(Heading { level, nodes })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct StringLine {
     pub nodes: Vec<Node>,
@@ -723,70 +724,133 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<S
         let start_pos = pair_inner.as_span().start();
         let end_pos = pair_inner.as_span().end();
         let (line, col) = pair_inner.as_span().start_pos().line_col();
-        let position = NodePosition {
-            // line: line as u32,
-            // column: col as u32,
-            start: start_pos as u32,
-            end: end_pos as u32,
-            // span_str: pair_inner.as_str().to_string(),
-        };
+
         match pair_inner.as_rule() {
             Rule::bold_italic_node => {
                 let mut inner_nodes: Vec<Node> = Vec::new();
                 inner_nodes.append(&mut parse_string_line(pair_inner, &path)?.nodes.clone());
-                nodes.push(Node::BoldItalic(inner_nodes, position));
+                let node_enum = NodeEnum::BoldItalic(inner_nodes);
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::bold_node => {
                 let mut inner_nodes: Vec<Node> = Vec::new();
                 inner_nodes.append(&mut parse_string_line(pair_inner, &path)?.nodes.clone());
-                nodes.push(Node::Bold(inner_nodes, position));
+                let node_enum = NodeEnum::Bold(inner_nodes);
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::italic_node => {
                 let mut inner_nodes: Vec<Node> = Vec::new();
                 inner_nodes.append(&mut parse_string_line(pair_inner, &path)?.nodes.clone());
-                nodes.push(Node::Italic(inner_nodes, position));
+                let node_enum = NodeEnum::Italic(inner_nodes);
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::named_link_node => {
-                nodes.push(Node::NamedMDLink(
-                    parse_named_link_node(pair_inner, &path)?,
-                    position,
-                ));
+                // nodes.push(Node::NamedMDLink(
+                //     parse_named_link_node(pair_inner, &path)?,
+                //     position,
+                // ));
+                let node_enum = NodeEnum::NamedMDLink(parse_named_link_node(pair_inner, &path)?);
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::link_node => {
-                nodes.push(Node::MDLink(pair_inner.as_str().to_string(), position));
+                // nodes.push(Node::MDLink(pair_inner.as_str().to_string(), position));
+                let node_enum = NodeEnum::MDLink(pair_inner.as_str().to_string());
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::weblink_node => {
-                nodes.push(Node::WebLink(
-                    parse_weblink_node(pair_inner, &path)?,
-                    position,
-                ));
+                // nodes.push(Node::WebLink(
+                //     parse_weblink_node(pair_inner, &path)?,
+                //     position,
+                // ));
+                let node_enum = NodeEnum::WebLink(parse_weblink_node(pair_inner, &path)?);
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::square_bracket_node => {
-                nodes.push(Node::SquareBracket(
-                    pair_inner.as_str().to_string(),
-                    position,
-                ));
+                // nodes.push(Node::SquareBracket(
+                //     pair_inner.as_str().to_string(),
+                //     position,
+                // ));
+                let node_enum = NodeEnum::SquareBracket(pair_inner.as_str().to_string());
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::latex_block_inline_node => {
-                nodes.push(Node::InlineLatexBlock(
-                    pair_inner.as_str().to_string(),
-                    position,
-                ));
+                // nodes.push(Node::InlineLatexBlock(
+                //     pair_inner.as_str().to_string(),
+                //     position,
+                // ));
+                let node_enum = NodeEnum::InlineLatexBlock(pair_inner.as_str().to_string());
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::code_block_inline_node => {
-                nodes.push(Node::InlineCodeBlock(
-                    pair_inner.as_str().to_string(),
-                    position,
-                ));
+                // nodes.push(Node::InlineCodeBlock(
+                //     pair_inner.as_str().to_string(),
+                //     position,
+                // ));
+                let node_enum = NodeEnum::InlineCodeBlock(pair_inner.as_str().to_string());
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::latex_inline_node => {
-                nodes.push(Node::InlineLatex(pair_inner.as_str().to_string(), position));
+                // nodes.push(Node::InlineLatex(pair_inner.as_str().to_string(), position));
+                let node_enum = NodeEnum::InlineLatex(pair_inner.as_str().to_string());
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::code_inline_node => {
-                nodes.push(Node::InlineCode(pair_inner.as_str().to_string(), position));
+                // nodes.push(Node::InlineCode(pair_inner.as_str().to_string(), position));
+                let node_enum = NodeEnum::InlineCode(pair_inner.as_str().to_string());
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             Rule::node => {
-                nodes.push(Node::Text(pair_inner.as_str().to_string(), position));
+                // nodes.push(Node::Text(pair_inner.as_str().to_string(), position));
+                let node_enum = NodeEnum::Text(pair_inner.as_str().to_string());
+                nodes.push(Node {
+                    node: node_enum,
+                    start: start_pos,
+                    end: end_pos,
+                });
             }
             _ => {
                 return Err(Error::ParseError(
@@ -800,120 +864,113 @@ fn parse_string_line(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<S
     Ok(StringLine { nodes })
 }
 
-#[derive(Debug, Clone)]
-pub struct NodePosition {
-    // pub line: u32,
-    // pub column: u32,
-    pub start: u32,
-    pub end: u32,
-    // debug only
-    // pub span_str: String,
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct NodePosition {
+//     // pub line: u32,
+//     // pub column: u32,
+//     // debug only
+//     // pub span_str: String,
+// }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+
+pub struct Node {
+    pub node: NodeEnum,
+    pub start: usize,
+    pub end: usize,
 }
 
-#[derive(Debug, Clone)]
-
-pub enum Node {
-    Text(String, NodePosition),
-    BoldItalic(Vec<Node>, NodePosition),
-    Bold(Vec<Node>, NodePosition),
-    Italic(Vec<Node>, NodePosition),
-    MDLink(String, NodePosition),
-    NamedMDLink(NamedMDLink, NodePosition),
-    WebLink(WebLink, NodePosition),
-    SquareBracket(String, NodePosition),
-    InlineCode(String, NodePosition),
-    InlineLatex(String, NodePosition),
-    InlineCodeBlock(String, NodePosition),
-    InlineLatexBlock(String, NodePosition),
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum NodeEnum {
+    Text(String),
+    BoldItalic(Vec<Node>),
+    Bold(Vec<Node>),
+    Italic(Vec<Node>),
+    MDLink(String),
+    NamedMDLink(NamedMDLink),
+    WebLink(WebLink),
+    SquareBracket(String),
+    InlineCode(String),
+    InlineLatex(String),
+    InlineCodeBlock(String),
+    InlineLatexBlock(String),
 }
 
 impl Node {
-    pub fn get_string_node(&self) -> Vec<StringPosition> {
-        match self {
-            Node::Text(_, pos) => {
-                vec![StringPosition {
-                    string_node: self,
-                    // line: pos.line,
-                    // column: pos.column,
-                    start: pos.start,
-                    end: pos.end,
-                }]
+    pub fn get_string_node(&self) -> Vec<Node> {
+        match &self.node {
+            NodeEnum::Text(node) => {
+                vec![self.clone()]
             }
-            Node::BoldItalic(nodes, pos) => {
-                let mut nodes_inner: Vec<StringPosition> = Vec::new();
-                for node in nodes {
-                    let inner_nodes = node.get_string_node();
-                    for node in inner_nodes {
-                        nodes_inner.push(node);
-                    }
-                }
-                nodes_inner
+            NodeEnum::BoldItalic(node) => {
+                let nodes: Vec<Node> = node
+                    .iter()
+                    .map(|node| node.get_string_node())
+                    .flatten()
+                    .collect();
+                nodes
             }
-            Node::Bold(nodes, pos) => {
-                let mut nodes_inner: Vec<StringPosition> = Vec::new();
-                for node in nodes {
-                    let inner_nodes = node.get_string_node();
-                    for node in inner_nodes {
-                        nodes_inner.push(node);
-                    }
-                }
-                nodes_inner
+            NodeEnum::Bold(node) => {
+                let nodes: Vec<Node> = node
+                    .iter()
+                    .map(|node| node.get_string_node())
+                    .flatten()
+                    .collect();
+                nodes
             }
-            Node::Italic(nodes, pos) => {
-                let mut nodes_inner: Vec<StringPosition> = Vec::new();
-                for node in nodes {
-                    let inner_nodes = node.get_string_node();
-                    for node in inner_nodes {
-                        nodes_inner.push(node);
-                    }
-                }
-                nodes_inner
+            NodeEnum::Italic(node) => {
+                let nodes: Vec<Node> = node
+                    .iter()
+                    .map(|node| node.get_string_node())
+                    .flatten()
+                    .collect();
+                nodes
             }
-            Node::MDLink(_, _) => vec![],
-            Node::NamedMDLink(_, _) => vec![],
-            Node::WebLink(_, _) => vec![],
-            Node::SquareBracket(_, _) => vec![],
-            Node::InlineCode(_, _) => vec![],
-            Node::InlineLatex(_, _) => vec![],
-            Node::InlineCodeBlock(_, _) => vec![],
-            Node::InlineLatexBlock(_, _) => vec![],
+            NodeEnum::MDLink(_) => vec![],
+            NodeEnum::NamedMDLink(_) => vec![],
+            NodeEnum::WebLink(_) => vec![],
+            NodeEnum::SquareBracket(_) => vec![],
+            NodeEnum::InlineCode(_) => vec![],
+            NodeEnum::InlineLatex(_) => vec![],
+            NodeEnum::InlineCodeBlock(_) => vec![],
+            NodeEnum::InlineLatexBlock(_) => vec![],
         }
     }
 
     pub(crate) fn get_inner_string(&self) -> Result<&str> {
-        match self {
-            Node::Text(s, _) => Ok(s.as_str()),
-            Node::BoldItalic(s, _) => Err(Error::Generic(f!(
+        match &self.node {
+            NodeEnum::Text(s) => Ok(s.as_str()),
+            NodeEnum::BoldItalic(s) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from BoldItalic"
             ))),
-            Node::Bold(s, _) => Err(Error::Generic(f!(
+            NodeEnum::Bold(s) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from Bold"
             ))),
-            Node::Italic(s, _) => Err(Error::Generic(f!(
+            NodeEnum::Italic(s) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from Italic"
             ))),
-            Node::MDLink(_, _) => Err(Error::Generic(f!(
+            NodeEnum::MDLink(_) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from MDLink"
             ))),
-            Node::NamedMDLink(_, _) => Err(Error::Generic(f!(
+            NodeEnum::NamedMDLink(_) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from NamedMDLink"
             ))),
-            Node::WebLink(_, _) => Err(Error::Generic(f!(
+            NodeEnum::WebLink(_) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from WebLink"
             ))),
-            Node::SquareBracket(_, _) => Err(Error::Generic(f!(
+            NodeEnum::SquareBracket(_) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from SquareBracket"
             ))),
-            Node::InlineCode(_, _) => Err(Error::Generic(f!(
+            NodeEnum::InlineCode(_) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from InlineCode"
             ))),
-            Node::InlineLatex(_, _) => Err(Error::Generic(f!(
+            NodeEnum::InlineLatex(_) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from InlineLatex"
             ))),
-            Node::InlineCodeBlock(_, _) => Err(Error::Generic(f!(
+            NodeEnum::InlineCodeBlock(_) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from InlineCodeBlock"
             ))),
-            Node::InlineLatexBlock(_, _) => Err(Error::Generic(f!(
+            NodeEnum::InlineLatexBlock(_) => Err(Error::Generic(f!(
                 "Unexpected call to get_inner_string from InlineLatexBlock"
             ))),
         }
@@ -938,7 +995,7 @@ impl Node {
     // }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct NamedMDLink {
     pub name: String,
@@ -971,7 +1028,7 @@ fn parse_named_link_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Resu
     Ok(NamedMDLink { name, link })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 
 pub struct WebLink {
     pub name: String,
@@ -1004,14 +1061,14 @@ fn parse_weblink_node(pair: pest::iterators::Pair<Rule>, path: &Path) -> Result<
     Ok(WebLink { name, link })
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct StringPosition<'a> {
-    pub string_node: &'a Node,
-    // pub line: u32,
-    // pub column: u32,
-    pub start: u32,
-    pub end: u32,
-}
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub(crate) struct StringPosition<'a> {
+//     pub string_node: &'a Node,
+//     // pub line: u32,
+//     // pub column: u32,
+//     pub start: u32,
+//     pub end: u32,
+// }
 
 // #[cfg(test)]
 // pub mod parser_tests {

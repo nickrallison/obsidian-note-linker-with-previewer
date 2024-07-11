@@ -1,11 +1,12 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use pest::error;
+use serde::{Deserialize, Serialize};
 
 use crate::parser::ParsedMDFile;
 use crate::prelude::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct File {
     pub path: PathBuf,
     pub contents: ParsedMDFile,
