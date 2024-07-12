@@ -48,14 +48,6 @@ export default class RustPlugin extends Plugin {
 			}
 		});
 
-		this.addCommand({
-			id: "list config",
-			name: "List Config",
-			callback: () => {
-				this.list_config()
-			}
-		});
-
 		this.addSettingTab(new RustPluginSettingTab(this.app, this));
 	}
 
@@ -71,31 +63,23 @@ export default class RustPlugin extends Plugin {
 		let cache_string: string = await this.app.vault.adapter.read(cache);
 		let cache_obj = JSON.parse(cache_string);
 		let link_to_self = false;
-		console.log('Parsing Files 1');
 		let settings = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
-		console.log('Settings Created');
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
-		console.log('Files Found');
 		let tfilemap: { [key: string]: TFile } = {};
 		for (let file of filelist) {
 			tfilemap[file.path] = file;
 		}
 		let file_paths: string[] = filelist.map(file => file.path);
-		console.log('Files Mapped');
 
 		let file_map: { [key: string]: string } = {};
 		for (let file of filelist) {
 			file_map[file.path] = await this.app.vault.cachedRead(file);
-			console.log('Read ' + file.path);
 		}
-		console.log('Files Read');
 		let wasm_vault: plugin.JsVault = plugin.JsVault.default();
-		console.log('Vault Created')
 
 		let total_files = filelist.length;
 		let index = 1;
 		for (let file of filelist) {
-			console.log(`(${index} / ${total_files}) Parsing ` + file.path);
 			wasm_vault.add_file(file.path, file_map[file.path]);
 			index++;
 		}
@@ -104,21 +88,27 @@ export default class RustPlugin extends Plugin {
 		for (let file_path of file_paths) {
 			files.push(wasm_vault.get_file(file_path));
 		}
-		console.log('Created File[] vec');
 		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
-		console.log('Created Settings Object');
 		let valid_file_paths: string[] = wasm_vault.get_valid_file_paths();
 		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
-		console.log('Got Valid Files');
 		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, settings_obj);
-		console.log('Created Link Finder');
 
 		let byte_increament_map: { [key: string]: number } = {};
-		console.log('Getting Links, One Moment Please...');
 
 		let valid_files_len = valid_files.length;
 		let valid_index = 1;
 		for (let file_path of valid_file_paths) {
+			let active_file = this.app.workspace.getActiveFile();
+			let active_file_path: string = "";
+			if (active_file != null) {
+				active_file_path = active_file.path;
+			}
+
+			if (file_path == active_file_path) {
+				new Notice("Cannot link the file you are currently editing");
+				continue
+			}
+
 			// if file is in cache and
 			// last modified time is the same or earlier as cache
 			// skip searching and get links from cache
@@ -151,7 +141,6 @@ export default class RustPlugin extends Plugin {
 				}
 				let slice_start = file_increment + link.get_start();
 				let slice_end = file_increment + link.get_end();
-				console.log('Link Found: ' + (file_increment + slice_start) + ' ' + (file_increment + slice_end));
 				let source = link.get_source();
 				let target = link.get_target();
 				let content = file_map[source];
@@ -185,10 +174,10 @@ export default class RustPlugin extends Plugin {
 				await modal.wait_for_submit();
 
 				if (modal.accepted) {
-					console.log('Accepted changes for ' + source);
 					let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
 					file_map[source] = new_content;
-					await this.app.vault.modify(tfile, new_content);
+
+					await this.app.vault.process(tfile, () => new_content);
 					if (byte_increament_map[source]) {
 						byte_increament_map[source] += increment;
 					} else {
@@ -197,7 +186,6 @@ export default class RustPlugin extends Plugin {
 				}
 
 				if (modal.declined) {
-					console.log('Declined changes for ' + source);
 					remaining_links.push(link);
 				}
 			}
@@ -207,12 +195,6 @@ export default class RustPlugin extends Plugin {
 			}
 			await this.app.vault.adapter.write(cache, JSON.stringify(cache_obj));
 		}
-	}
-
-	async list_config() {
-		let config_dir: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer';
-		let config_files = await this.app.vault.adapter.list(config_dir);
-		console.log(config_files);
 	}
 
 	async loadSettings() {
@@ -271,9 +253,9 @@ class ParseModal extends Modal {
 
 	}
 
-	onSubmit() {
-		console.log('Submitting');
-	}
+	// onSubmit() {
+	// 	console.log('Submitting');
+	// }
 
 	async wait_for_submit() {
 		while (!this.accepted && !this.declined) {
@@ -302,12 +284,12 @@ class RustPluginSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', { text: 'Settings for my awesome plugin.' });
+		// containerEl.createEl('h2', { text: 'Settings for my awesome plugin.' });
 
 
 		new Setting(containerEl)
-			.setName('Case Insensitive')
-			.setDesc('Whether to use a case Insensitive search when linking files')
+			.setName('Case insensitive')
+			.setDesc('Whether to use a case insensitive search when linking files')
 			.addToggle(text => text
 				.setValue(this.plugin.settings.caseInsensitive)
 				.onChange(async (value) => {
@@ -315,8 +297,8 @@ class RustPluginSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				}));
 		new Setting(containerEl)
-			.setName('Color of Links')
-			.setDesc('Color to show links in the preview (no effect on the actual file), any supported CSS color is valid. Default is "red", but could also use hex: "#2ecc71".')
+			.setName('Color of links')
+			.setDesc('Color to show links in the preview (no effect on the actual file), any supported CSS color is valid. Default is "red", but could also use hex: "#2ecc71"')
 			.addText(text => text
 				.setValue(this.plugin.settings.color)
 				.onChange(async (value) => {

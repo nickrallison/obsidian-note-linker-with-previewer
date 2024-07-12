@@ -2,10 +2,11 @@
 
 ## How to Use
 
+All you have to do is run the "Link Vault" command. Any file changes will be prompted, and no note changes are automatic.
+
+The first link may be slow, but subsequent links should be much faster as results are cached & reused if possible.
 
 ## Developement
-
-### Building
 
 ```bash
 cd [pluginfolder]
@@ -26,14 +27,3 @@ ENOENT: no such file or directory, open '... obsidian-note-linker-with-previewer
 - cargo
 - wasm-pack
 - yarn
-
-### Todo
-
-- Performance
-    - Serde and Selectively Searching based on last modified metadata
-    - Non-Blocking search, so it keeps going in background
-    - Completely Background search
-- Organization
-    - Update Plugin name and description
-    - Add CI Build
-    - Add Nix Flake to build more easily 

@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-note-linker-with-previewer",
-	"description": "This is a note linker plugin that includes a markdown parser to only link valid note sections and a previewer to view any changes before accepting them.",
+	"description": "This is a note linker plugin that includes a markdown parser to only link valid note sections and a previewer to view any changes before accepting them",
 	"version": "1.0.0",
 	"main": "main.js",
 	"scripts": {
