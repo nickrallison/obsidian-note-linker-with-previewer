@@ -301,10 +301,6 @@ export default class RustPlugin extends Plugin {
 
 		let byte_increament_map: { [key: string]: number } = {};
 
-		// if active file is not in the filelist return
-		if (!valid_file_paths.find(file => file == active_file_path)) {
-			return;
-		}
 
 		valid_file_paths = [active_file_path];
 
