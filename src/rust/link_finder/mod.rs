@@ -1,4 +1,5 @@
 use regex::{Regex, RegexBuilder};
+use serde::{Deserialize, Serialize};
 
 use crate::parser::ParsedMDFile;
 use crate::prelude::*;
@@ -8,12 +9,34 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub(crate) struct Link {
     pub source: PathBuf,
     pub target: PathBuf,
     pub byte_start: usize,
     pub byte_end: usize,
+}
+
+impl Link {
+    pub(crate) fn new(
+        source: PathBuf,
+        target: PathBuf,
+        byte_start: usize,
+        byte_end: usize,
+    ) -> Self {
+        Link {
+            source,
+            target,
+            byte_start,
+            byte_end,
+        }
+    }
+    pub(crate) fn ser(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+    pub(crate) fn deser(s: &str) -> Self {
+        serde_json::from_str(s).unwrap()
+    }
 }
 
 #[derive(Debug)]

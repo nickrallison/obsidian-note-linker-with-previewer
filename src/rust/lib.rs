@@ -234,6 +234,17 @@ pub struct JsLink {
 
 #[wasm_bindgen]
 impl JsLink {
+    #[wasm_bindgen(constructor)]
+    pub fn new(serialized: JsString) -> JsLink {
+        let serialized: String = f!("{}", serialized);
+        let link = link_finder::Link::deser(&serialized);
+        JsLink { link }
+    }
+    #[wasm_bindgen]
+    pub fn serialize(&self) -> JsString {
+        let serialized: String = self.link.ser();
+        JsString::from(serialized)
+    }
     #[wasm_bindgen]
     pub fn get_source(&self) -> JsString {
         JsString::from(format!("{}", self.link.source.display()))

@@ -42,11 +42,30 @@ export default class RustPlugin extends Plugin {
 		await plugin.default(Promise.resolve(buffer));
 		plugin.onload(this);
 
+		// Cleaning the cache
+		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
+		let cache_string: string = await this.app.vault.adapter.read(cache);
+		let cache_obj = JSON.parse(cache_string);
+		for (let key in cache_obj) {
+			if (!this.app.vault.getAbstractFileByPath(key)) {
+				delete cache_obj[key];
+			}
+		}
+		await this.app.vault.adapter.write(cache, JSON.stringify(cache_obj));
+
 		this.addCommand({
 			id: "link_vault",
 			name: "Link Vault",
 			callback: () => {
 				this.run_linker()
+			}
+		});
+
+		this.addCommand({
+			id: "scan_vault",
+			name: "Scan Vault",
+			callback: () => {
+				this.scan_vault()
 			}
 		});
 
@@ -145,7 +164,8 @@ export default class RustPlugin extends Plugin {
 				let file_last_modified = tfilemap[file_path].stat.mtime;
 				// if last modified time is the same or earlier as cache
 				if (file_last_modified <= last_modified) {
-					file_links = cache_obj[file_path]['links'];
+					let file_links_serialized: string[] = cache_obj[file_path]['links'];
+					file_links = file_links_serialized.map(link_serialized => new plugin.JsLink(link_serialized));
 				}
 				else {
 					file_links = link_finder.find_links(file);
@@ -157,7 +177,7 @@ export default class RustPlugin extends Plugin {
 			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
 			new Notice(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
 			valid_index++;
-			let remaining_links: plugin.JsLink[] = []
+			let remaining_links: string[] = []
 			for (let link of file_links) {
 				let file_increment: number = 0;
 				if (byte_increament_map[file_path]) {
@@ -210,8 +230,112 @@ export default class RustPlugin extends Plugin {
 				}
 
 				if (modal.declined) {
-					remaining_links.push(link);
+					let json_link_serialized = link.serialize();
+					remaining_links.push(json_link_serialized);
 				}
+			}
+			cache_obj[file_path] = {
+				'time': tfilemap[file_path].stat.mtime,
+				'links': remaining_links
+			}
+			await this.app.vault.adapter.write(cache, JSON.stringify(cache_obj));
+		}
+	}
+
+	async scan_vault() {
+		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
+		// if cache file does not exist, create it
+		if (!await this.app.vault.adapter.exists(cache)) {
+			await this.app.vault.adapter.write(cache, '{}');
+		}
+		let link_to_self = false;
+		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
+		let filtered_filelist: TFile[] = [];
+		let includePaths: string[];
+		if (this.settings.includePaths == "") {
+			includePaths = [];
+		}
+		else {
+			includePaths = this.settings.includePaths.split("\n");
+		}
+
+		// only add files that are prefixed by one of the include paths
+		if (includePaths.length > 0) {
+			for (let file of filelist) {
+				for (let path of includePaths) {
+					if (file.path.startsWith(path)) {
+						filtered_filelist.push(file);
+						break;
+					}
+				}
+			}
+			filelist = filtered_filelist;
+		}
+
+		let tfilemap: { [key: string]: TFile } = {};
+		for (let file of filelist) {
+			tfilemap[file.path] = file;
+		}
+		let file_paths: string[] = filelist.map(file => file.path);
+
+		let file_map: { [key: string]: string } = {};
+		for (let file of filelist) {
+			file_map[file.path] = await this.app.vault.cachedRead(file);
+		}
+		let wasm_vault: plugin.JsVault = plugin.JsVault.default();
+
+		let total_files = filelist.length;
+		let index = 1;
+		for (let file of filelist) {
+			wasm_vault.add_file(file.path, file_map[file.path]);
+			index++;
+		}
+
+		let files: plugin.JsFile[] = [];
+		for (let file_path of file_paths) {
+			files.push(wasm_vault.get_file(file_path));
+		}
+		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
+		let valid_file_paths: string[] = wasm_vault.get_valid_file_paths();
+		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
+		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, settings_obj);
+
+		// let byte_increament_map: { [key: string]: number } = {};
+
+		let valid_files_len = valid_files.length;
+		let valid_index = 1;
+		for (let file_path of valid_file_paths) {
+			let cache_string: string = await this.app.vault.adapter.read(cache);
+			let cache_obj = JSON.parse(cache_string);
+			// if file is in cache and
+			// last modified time is the same or earlier as cache
+			// skip searching and get links from cache
+			let file: plugin.JsFile = wasm_vault.get_file(file_path);
+			let file_links: plugin.JsLink[];
+
+			// if file is in cache
+			if (cache_obj[file_path]) {
+				let last_modified = cache_obj[file_path]['time'];
+				let file_last_modified = tfilemap[file_path].stat.mtime;
+				// if last modified time is the same or earlier as cache
+				if (file_last_modified <= last_modified) {
+					let file_links_serialized: string[] = cache_obj[file_path]['links'];
+					file_links = file_links_serialized.map(link_serialized => new plugin.JsLink(link_serialized));
+				}
+				else {
+					file_links = link_finder.find_links(file);
+				}
+			}
+			else {
+				file_links = link_finder.find_links(file);
+			}
+			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
+			new Notice(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
+			valid_index++;
+			let remaining_links: string[] = []
+			for (let link of file_links) {
+				let json_link_serialized = link.serialize();
+				remaining_links.push(json_link_serialized);
 			}
 			cache_obj[file_path] = {
 				'time': tfilemap[file_path].stat.mtime,
