@@ -269,27 +269,28 @@ export default class RustPlugin extends Plugin {
 		let link_to_self = false;
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
 		let filtered_filelist: TFile[] = [];
-		let includePaths: string[];
-		if (this.settings.includePaths == "") {
-			includePaths = [];
-		}
-		else {
-			includePaths = this.settings.includePaths.split("\n");
-		}
+		let includePaths: string[] = [];
+
+		// if (this.settings.includePaths == "") {
+		// 	includePaths = [];
+		// }
+		// else {
+		// 	includePaths = this.settings.includePaths.split("\n");
+		// }
 
 		// if include paths is empty, include all files
 		// otherwise only add files that are prefixed by one of the include paths
-		if (includePaths.length > 0) {
-			for (let file of filelist) {
-				for (let path of includePaths) {
-					if (file.path.startsWith(path)) {
-						filtered_filelist.push(file);
-						break;
-					}
-				}
-			}
-			filelist = filtered_filelist;
-		}
+		// if (includePaths.length > 0) {
+		// 	for (let file of filelist) {
+		// 		for (let path of includePaths) {
+		// 			if (file.path.startsWith(path)) {
+		// 				filtered_filelist.push(file);
+		// 				break;
+		// 			}
+		// 		}
+		// 	}
+		// 	filelist = filtered_filelist;
+		// }
 
 		let tfilemap: { [key: string]: TFile } = {};
 		for (let file of filelist) {
