@@ -78,6 +78,14 @@ export default class RustPlugin extends Plugin {
 		if (!await this.app.vault.adapter.exists(cache)) {
 			await this.app.vault.adapter.write(cache, '{}');
 		}
+
+		// save file if it is open
+		let active_view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (active_view) {
+			await active_view.save();
+		}
+
+
 		let cache_string: string = await this.app.vault.adapter.read(cache);
 		let cache_obj = JSON.parse(cache_string);
 		let link_to_self = false;
@@ -138,18 +146,6 @@ export default class RustPlugin extends Plugin {
 		let valid_files_len = valid_files.length;
 		let valid_index = 1;
 		for (let file_path of valid_file_paths) {
-			let active_file = this.app.workspace.getActiveFile();
-			let active_file_path: string = "";
-			if (active_file != null) {
-				active_file_path = active_file.path;
-			}
-
-			if (file_path == active_file_path) {
-				new Notice("Cannot link the file you are currently editing");
-				valid_index++;
-				continue
-			}
-
 			// if file is in cache, is up to date, and has no links, skip
 			// tfilemap[file_path].stat.mtime; <= cached last modified time
 			if (cache_obj[file_path] && cache_obj[file_path]['links'].length == 0 && tfilemap[file_path].stat.mtime <= cache_obj[file_path]['time']) {
