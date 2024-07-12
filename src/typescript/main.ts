@@ -146,7 +146,16 @@ export default class RustPlugin extends Plugin {
 
 			if (file_path == active_file_path) {
 				new Notice("Cannot link the file you are currently editing");
+				valid_index++;
 				continue
+			}
+
+			// if file is in cache, is up to date, and has no links, skip
+			// tfilemap[file_path].stat.mtime; <= cached last modified time
+			if (cache_obj[file_path] && cache_obj[file_path]['links'].length == 0 && tfilemap[file_path].stat.mtime <= cache_obj[file_path]['time']) {
+				console.log(`(${valid_index} / ${valid_files_len}) up to date ` + file_path);
+				valid_index++;
+				continue;
 			}
 
 			let file: plugin.JsFile = wasm_vault.get_file(file_path);
