@@ -3,7 +3,7 @@
 	"name": "Note Linker with Previewer",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "This is a note linker plugin that includes a markdown parser to only link valid note sections and a previewer to view any changes before accepting them.",
+	"description": "This is a note linker plugin that includes a markdown parser to only link valid note sections and a previewer to view any changes before accepting them",
 	"author": "Nick Allison",
 	"authorUrl": "https://github.com/nickrallison",
 	"fundingUrl": "https://github.com/sponsors/nickrallison",
