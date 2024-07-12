@@ -8,10 +8,12 @@ import * as plugin from "../../pkg/obsidian_note_linker_with_previewer.js";
 class RustPluginSettings {
 	caseInsensitive: boolean;
 	color: string;
+	includePaths: string;
 
 	constructor(caseInsensitive: boolean, color: string) {
 		this.caseInsensitive = caseInsensitive;
 		this.color = color;
+		this.includePaths = "";
 	}
 	set_case_insensitive(caseSensitive: boolean) {
 		this.caseInsensitive = caseSensitive;
@@ -63,8 +65,30 @@ export default class RustPlugin extends Plugin {
 		let cache_string: string = await this.app.vault.adapter.read(cache);
 		let cache_obj = JSON.parse(cache_string);
 		let link_to_self = false;
-		let settings = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
+		// let settings = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
+		let filtered_filelist: TFile[] = [];
+		let includePaths: string[];
+		if (this.settings.includePaths == "") {
+			includePaths = [];
+		}
+		else {
+			includePaths = this.settings.includePaths.split("\n");
+		}
+
+		// only add files that are prefixed by one of the include paths
+		if (includePaths.length > 0) {
+			for (let file of filelist) {
+				for (let path of includePaths) {
+					if (file.path.startsWith(path)) {
+						filtered_filelist.push(file);
+						break;
+					}
+				}
+			}
+			filelist = filtered_filelist;
+		}
+
 		let tfilemap: { [key: string]: TFile } = {};
 		for (let file of filelist) {
 			tfilemap[file.path] = file;
@@ -244,7 +268,6 @@ class ParseModal extends Modal {
 					.setButtonText("Decline")
 					.setCta()
 					.onClick(() => {
-
 						this.close();
 						this.declined = true;
 					}));
@@ -303,6 +326,16 @@ class RustPluginSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.color)
 				.onChange(async (value) => {
 					this.plugin.settings.color = value;
+					await this.plugin.saveSettings();
+				}));
+		new Setting(containerEl)
+			.setName('Include Paths')
+			.setDesc('Paths to include in linking, default is all files in the vault')
+			.addTextArea(text => text
+				.setValue(this.plugin.settings.includePaths)
+				.onChange(async (value) => {
+
+					this.plugin.settings.includePaths = value;
 					await this.plugin.saveSettings();
 				}));
 	}
