@@ -7,30 +7,22 @@ import * as plugin from "../../pkg/obsidian_note_linker_with_previewer.js";
 
 class RustPluginSettings {
 	caseInsensitive: boolean;
-	linkToSelf: boolean;
 	color: string;
 
-	constructor(caseInsensitive: boolean, linkToSelf: boolean, color: string) {
+	constructor(caseInsensitive: boolean, color: string) {
 		this.caseInsensitive = caseInsensitive;
-		this.linkToSelf = linkToSelf;
 		this.color = color;
 	}
 	set_case_insensitive(caseSensitive: boolean) {
 		this.caseInsensitive = caseSensitive;
 	}
-	set_link_to_self(linkToSelf: boolean) {
-		this.linkToSelf = linkToSelf;
-	}
 	get_case_insensitive() {
 		return this.caseInsensitive;
-	}
-	get_link_to_self() {
-		return this.linkToSelf;
 	}
 
 }
 
-const DEFAULT_SETTINGS: RustPluginSettings = new RustPluginSettings(true, false, "red");
+const DEFAULT_SETTINGS: RustPluginSettings = new RustPluginSettings(true, "red");
 
 interface FileChange {
 	file_path: string;
@@ -68,11 +60,26 @@ export default class RustPlugin extends Plugin {
 	}
 
 	async run_linker() {
+		// json file with structure cache[path] = {...}
+		// cache[path]['time'] = last_modified_time
+		// cache[path]['links_remaining'] = remaining links to link
+		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
+		// if cache file does not exist, create it
+		if (!await this.app.vault.adapter.exists(cache)) {
+			await this.app.vault.adapter.write(cache, '{}');
+		}
+		let cache_string: string = await this.app.vault.adapter.read(cache);
+		let cache_obj = JSON.parse(cache_string);
+		let link_to_self = false;
 		console.log('Parsing Files 1');
-		let settings = new plugin.JsSettings(this.settings.caseInsensitive, this.settings.linkToSelf, this.settings.color);
+		let settings = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
 		console.log('Settings Created');
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
 		console.log('Files Found');
+		let tfilemap: { [key: string]: TFile } = {};
+		for (let file of filelist) {
+			tfilemap[file.path] = file;
+		}
 		let file_paths: string[] = filelist.map(file => file.path);
 		console.log('Files Mapped');
 
@@ -98,7 +105,7 @@ export default class RustPlugin extends Plugin {
 			files.push(wasm_vault.get_file(file_path));
 		}
 		console.log('Created File[] vec');
-		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, this.settings.linkToSelf, this.settings.color);
+		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
 		console.log('Created Settings Object');
 		let valid_file_paths: string[] = wasm_vault.get_valid_file_paths();
 		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
@@ -112,12 +119,31 @@ export default class RustPlugin extends Plugin {
 		let valid_files_len = valid_files.length;
 		let valid_index = 1;
 		for (let file_path of valid_file_paths) {
+			// if file is in cache and
+			// last modified time is the same or earlier as cache
+			// skip searching and get links from cache
 			let file: plugin.JsFile = wasm_vault.get_file(file_path);
-			let file_links: plugin.JsLink[] = link_finder.find_links(file);
+			let file_links: plugin.JsLink[];
+
+			// if file is in cache
+			if (cache_obj[file_path]) {
+				let last_modified = cache_obj[file_path]['time'];
+				let file_last_modified = tfilemap[file_path].stat.mtime;
+				// if last modified time is the same or earlier as cache
+				if (file_last_modified <= last_modified) {
+					file_links = cache_obj[file_path]['links'];
+				}
+				else {
+					file_links = link_finder.find_links(file);
+				}
+			}
+			else {
+				file_links = link_finder.find_links(file);
+			}
 			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
 			new Notice(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
 			valid_index++;
-
+			let remaining_links: plugin.JsLink[] = []
 			for (let link of file_links) {
 				let file_increment: number = 0;
 				if (byte_increament_map[file_path]) {
@@ -172,9 +198,14 @@ export default class RustPlugin extends Plugin {
 
 				if (modal.declined) {
 					console.log('Declined changes for ' + source);
-
+					remaining_links.push(link);
 				}
 			}
+			cache_obj[file_path] = {
+				'time': tfilemap[file_path].stat.mtime,
+				'links': remaining_links
+			}
+			await this.app.vault.adapter.write(cache, JSON.stringify(cache_obj));
 		}
 	}
 
@@ -281,15 +312,6 @@ class RustPluginSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.caseInsensitive)
 				.onChange(async (value) => {
 					this.plugin.settings.caseInsensitive = value;
-					await this.plugin.saveSettings();
-				}));
-		new Setting(containerEl)
-			.setName('Link to Self')
-			.setDesc('Whether to link to the same file')
-			.addToggle(text => text
-				.setValue(this.plugin.settings.linkToSelf)
-				.onChange(async (value) => {
-					this.plugin.settings.linkToSelf = value;
 					await this.plugin.saveSettings();
 				}));
 		new Setting(containerEl)
