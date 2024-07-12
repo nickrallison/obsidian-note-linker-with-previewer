@@ -301,7 +301,6 @@ export default class RustPlugin extends Plugin {
 
 		let byte_increament_map: { [key: string]: number } = {};
 
-
 		valid_file_paths = [active_file_path];
 
 		let valid_files_len = valid_file_paths.length;
@@ -354,7 +353,6 @@ export default class RustPlugin extends Plugin {
 				let byteArray = encoder.encode(content);
 
 				let content_as_bytes = encoder.encode(content);
-
 
 				let slicedArray = byteArray.slice(slice_start, slice_end);
 				let slice_str = decoder.decode(slicedArray);
@@ -507,8 +505,6 @@ export default class RustPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
-
-
 }
 
 class ParseModal extends Modal {
@@ -527,16 +523,13 @@ class ParseModal extends Modal {
 	}
 
 	async onOpen() {
-
 		const { contentEl } = this;
-
 		new Setting(contentEl)
 			.addButton((btn) =>
 				btn
 					.setButtonText("Accept")
 					.setCta()
 					.onClick(() => {
-
 						this.close();
 						this.accepted = true;
 					}));
@@ -579,7 +572,6 @@ class RustPluginSettingTab extends PluginSettingTab {
 
 	display(): void {
 		const { containerEl } = this;
-
 		containerEl.empty();
 
 		new Setting(containerEl)
@@ -606,7 +598,6 @@ class RustPluginSettingTab extends PluginSettingTab {
 			.addTextArea(text => text
 				.setValue(this.plugin.settings.includePaths)
 				.onChange(async (value) => {
-
 					this.plugin.settings.includePaths = value;
 					await this.plugin.saveSettings();
 				}));
