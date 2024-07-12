@@ -555,10 +555,6 @@ class ParseModal extends Modal {
 
 	}
 
-	// onSubmit() {
-	// 	console.log('Submitting');
-	// }
-
 	async wait_for_submit() {
 		while (!this.accepted && !this.declined) {
 			await new Promise((resolve) => setTimeout(resolve, 100));
@@ -585,9 +581,6 @@ class RustPluginSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 
 		containerEl.empty();
-
-		// containerEl.createEl('h2', { text: 'Settings for my awesome plugin.' });
-
 
 		new Setting(containerEl)
 			.setName('Case insensitive')
