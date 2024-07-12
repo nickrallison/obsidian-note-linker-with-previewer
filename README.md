@@ -9,7 +9,7 @@ This is a plugin to find links between your notes. That's it, that's all it does
 - Doesn't link inside code blocks, latex blocks, or other special markdown tools, it does this as it has a built in markdown parser
 	- If you encounter any links placed in bad locations, please open a ticket and I'll fix it as soon as I am able.
 
-https://github.com/user-attachments/assets/b32faf3e-823c-4fc4-a09c-ec9a144dcafe
+![2024-07-12 14-31-18](https://github.com/user-attachments/assets/24c5b38b-5e8b-4d72-95e4-ee91f0cae5b6)
 
 - "Fast" Linking. Searching for links is an intensive operation, this is the most intensive part of this plugin. It uses caching to reuse up to date links, so rerunning the command to link your vault will be much faster on the second run.
 
