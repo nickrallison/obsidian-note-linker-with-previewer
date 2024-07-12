@@ -1,9 +1,8 @@
 import { App, Component, Editor, MarkdownRenderer, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, Vault } from 'obsidian';
-
-import rustPlugin from "../../pkg/obsidian_note_linker_with_previewer_bg.wasm";
 import * as plugin from "../../pkg/obsidian_note_linker_with_previewer.js";
 
-// Remember to rename these classes and interfaces!
+// DO NOT REMOVE, PLUGIN DOES NOT LOAD WITHOUT IT
+import rustPlugin from "../../pkg/obsidian_note_linker_with_previewer_bg.wasm";
 
 class RustPluginSettings {
 	caseInsensitive: boolean;
@@ -37,10 +36,11 @@ export default class RustPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
-		// Instantiates the given module, which can either be bytes or a precompiled WebAssembly.Module.
+
+		// DO NOT REMOVE, PLUGIN DOES NOT LOAD WITHOUT IT
 		const buffer = Buffer.from(rustPlugin, 'base64')
+		// DO NOT REMOVE, PLUGIN DOES NOT LOAD WITHOUT IT
 		await plugin.default(Promise.resolve(buffer));
-		plugin.onload(this);
 
 		// Cleaning the cache
 		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
@@ -73,9 +73,6 @@ export default class RustPlugin extends Plugin {
 	}
 
 	async run_linker() {
-		// json file with structure cache[path] = {...}
-		// cache[path]['time'] = last_modified_time
-		// cache[path]['links_remaining'] = remaining links to link
 		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
 		// if cache file does not exist, create it
 		if (!await this.app.vault.adapter.exists(cache)) {
@@ -84,7 +81,6 @@ export default class RustPlugin extends Plugin {
 		let cache_string: string = await this.app.vault.adapter.read(cache);
 		let cache_obj = JSON.parse(cache_string);
 		let link_to_self = false;
-		// let settings = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
 		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
 		let filtered_filelist: TFile[] = [];
 		let includePaths: string[];
@@ -95,7 +91,8 @@ export default class RustPlugin extends Plugin {
 			includePaths = this.settings.includePaths.split("\n");
 		}
 
-		// only add files that are prefixed by one of the include paths
+		// if include paths is empty, include all files
+		// otherwise only add files that are prefixed by one of the include paths
 		if (includePaths.length > 0) {
 			for (let file of filelist) {
 				for (let path of includePaths) {
@@ -152,13 +149,9 @@ export default class RustPlugin extends Plugin {
 				continue
 			}
 
-			// if file is in cache and
-			// last modified time is the same or earlier as cache
-			// skip searching and get links from cache
 			let file: plugin.JsFile = wasm_vault.get_file(file_path);
 			let file_links: plugin.JsLink[];
 
-			// if file is in cache
 			if (cache_obj[file_path]) {
 				let last_modified = cache_obj[file_path]['time'];
 				let file_last_modified = tfilemap[file_path].stat.mtime;
@@ -203,7 +196,6 @@ export default class RustPlugin extends Plugin {
 				let replaced_as_bytes = encoder.encode(replace_str);
 				let increment = replaced_as_bytes.length - (slice_end - slice_start);
 				let color = this.settings.color;
-				// <span style=color:#2ecc71>This is a test</span>  
 				let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${slice_str}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
 				let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${slice_str}]]` + decoder.decode(content_as_bytes.slice(slice_end));
 
@@ -259,7 +251,8 @@ export default class RustPlugin extends Plugin {
 			includePaths = this.settings.includePaths.split("\n");
 		}
 
-		// only add files that are prefixed by one of the include paths
+		// if include paths is empty, include all files
+		// otherwise only add files that are prefixed by one of the include paths
 		if (includePaths.length > 0) {
 			for (let file of filelist) {
 				for (let path of includePaths) {
@@ -300,16 +293,11 @@ export default class RustPlugin extends Plugin {
 		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
 		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, settings_obj);
 
-		// let byte_increament_map: { [key: string]: number } = {};
-
 		let valid_files_len = valid_files.length;
 		let valid_index = 1;
 		for (let file_path of valid_file_paths) {
 			let cache_string: string = await this.app.vault.adapter.read(cache);
 			let cache_obj = JSON.parse(cache_string);
-			// if file is in cache and
-			// last modified time is the same or earlier as cache
-			// skip searching and get links from cache
 			let file: plugin.JsFile = wasm_vault.get_file(file_path);
 			let file_links: plugin.JsLink[];
 
