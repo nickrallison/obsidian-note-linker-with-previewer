@@ -42,14 +42,11 @@ impl Link {
 #[derive(Debug)]
 pub(crate) struct LinkFinder {
     groups: Vec<(PathBuf, String)>,
-    settings: crate::settings::Settings,
+    case_insensitive: bool,
 }
 
 impl LinkFinder {
-    pub(crate) fn new(
-        files: Vec<&crate::vault::File>,
-        settings: crate::settings::Settings,
-    ) -> Self {
+    pub(crate) fn new(files: Vec<&crate::vault::File>, case_insensitive: bool) -> Self {
         let mut file_groups: HashMap<usize, PathBuf> = HashMap::new();
         let mut group_index: usize = 1;
         let mut file_regex_strs: Vec<(PathBuf, String)> = vec![];
@@ -72,7 +69,7 @@ impl LinkFinder {
 
         LinkFinder {
             groups: file_regex_strs,
-            settings: settings,
+            case_insensitive,
         }
     }
 
@@ -90,7 +87,7 @@ impl LinkFinder {
             .collect::<Vec<String>>();
         let regex_str: String = regex_strs.join("|");
         let regex: Regex = RegexBuilder::new(&regex_str)
-            .case_insensitive(self.settings.case_insensitive)
+            .case_insensitive(self.case_insensitive)
             .build()?;
         Ok((regex, file_groups))
     }
@@ -117,7 +114,7 @@ impl LinkFinder {
             .collect::<Vec<String>>();
         let regex_str: String = regex_strs.join("|");
         let regex: Regex = RegexBuilder::new(&regex_str)
-            .case_insensitive(self.settings.case_insensitive)
+            .case_insensitive(self.case_insensitive)
             .build()?;
         Ok((regex, file_groups))
     }
@@ -163,9 +160,9 @@ impl LinkFinder {
                 Err(_) => (),
             }
         }
-        if !self.settings.link_to_self {
-            links.retain(|link| link.source != link.target);
-        }
+        // if !self.settings.link_to_self {
+        //     links.retain(|link| link.source != link.target);
+        // }
         links
     }
 }
@@ -229,13 +226,13 @@ pub mod link_finder_test {
 
     #[test]
     fn regex_construct_test() {
-        let settings = crate::settings::Settings::new(true, false, "red".to_string());
+        // let settings = crate::settings::Settings::new(true, "red".to_string());
         let file_1_path: PathBuf = PathBuf::from(FILE_1_PATH);
         let file_2_path: PathBuf = PathBuf::from(FILE_2_PATH);
         let file1 = crate::vault::File::new(file_1_path, FILE_1_CONT.to_string()).unwrap();
         let file2 = crate::vault::File::new(file_2_path, FILE_2_CONT.to_string()).unwrap();
         let files = vec![&file1, &file2];
-        let link_finder = LinkFinder::new(files, settings);
+        let link_finder = LinkFinder::new(files, true);
         let (regex, group_map) = link_finder.create_regex().unwrap();
 
         assert_eq!(group_map.len(), 3);
@@ -249,13 +246,13 @@ pub mod link_finder_test {
     }
     #[test]
     fn link_alan_turing_test() {
-        let settings = crate::settings::Settings::new(true, false, "red".to_string());
+        // let settings = crate::settings::Settings::new(true, "red".to_string());
         let file_1_path: PathBuf = PathBuf::from(FILE_1_PATH);
         let file_2_path: PathBuf = PathBuf::from(FILE_2_PATH);
         let file1 = crate::vault::File::new(file_1_path, FILE_1_CONT.to_string()).unwrap();
         let file2 = crate::vault::File::new(file_2_path, FILE_2_CONT.to_string()).unwrap();
         let files = vec![&file1, &file2];
-        let link_finder = LinkFinder::new(files, settings);
+        let link_finder = LinkFinder::new(files, true);
 
         let (regex, group_map) = link_finder
             .create_regex_exc(&PathBuf::from(FILE_1_PATH))
@@ -278,13 +275,13 @@ pub mod link_finder_test {
 
     #[test]
     fn link_turing_machine_test() {
-        let settings = crate::settings::Settings::new(true, false, "red".to_string());
+        // let settings = crate::settings::Settings::new(true, false, "red".to_string());
         let file_1_path: PathBuf = PathBuf::from(FILE_1_PATH);
         let file_2_path: PathBuf = PathBuf::from(FILE_2_PATH);
         let file1 = crate::vault::File::new(file_1_path, FILE_1_CONT.to_string()).unwrap();
         let file2 = crate::vault::File::new(file_2_path, FILE_2_CONT.to_string()).unwrap();
         let files = vec![&file1, &file2];
-        let link_finder = LinkFinder::new(files, settings);
+        let link_finder = LinkFinder::new(files, true);
         let (regex, group_map) = link_finder
             .create_regex_exc(&PathBuf::from(FILE_2_PATH))
             .unwrap();

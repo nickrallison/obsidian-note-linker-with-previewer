@@ -33,6 +33,8 @@ interface FileChange {
 
 export default class RustPlugin extends Plugin {
 	settings: RustPluginSettings;
+	cache_path: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
+	cache_obj: { [key: string]: any } = {};
 
 	async onload() {
 		await this.loadSettings();
@@ -43,15 +45,17 @@ export default class RustPlugin extends Plugin {
 		await plugin.default(Promise.resolve(buffer));
 
 		// Cleaning the cache
-		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
-		let cache_string: string = await this.app.vault.adapter.read(cache);
+		if (!await this.app.vault.adapter.exists(this.cache_path)) {
+			await this.app.vault.adapter.write(this.cache_path, '{}');
+		}
+		let cache_string: string = await this.app.vault.adapter.read(this.cache_path);
 		let cache_obj = JSON.parse(cache_string);
 		for (let key in cache_obj) {
 			if (!this.app.vault.getAbstractFileByPath(key)) {
 				delete cache_obj[key];
 			}
 		}
-		await this.app.vault.adapter.write(cache, JSON.stringify(cache_obj));
+		await this.app.vault.adapter.write(this.cache_path, JSON.stringify(cache_obj));
 
 		this.addCommand({
 			id: "link_current_file",
@@ -80,422 +84,103 @@ export default class RustPlugin extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: "invalid_notes",
+			name: "Get Invalid Notes",
+			callback: () => {
+				this.get_invalid_notes()
+			}
+		});
+
 		this.addSettingTab(new RustPluginSettingTab(this.app, this));
 	}
 
 	async run_linker() {
-		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
-		// if cache file does not exist, create it
-		if (!await this.app.vault.adapter.exists(cache)) {
-			await this.app.vault.adapter.write(cache, '{}');
-		}
+		await this.save_active_file();
+		let tfilemap: { [key: string]: TFile } = await this.get_filtered_filemap();
+		let file_paths: string[] = Object.keys(tfilemap);
+		let wasm_vault: plugin.JsVault = await this.create_wasm_vault(tfilemap);
+		let alias_map: { [key: string]: string[] } = await this.get_alias_map(tfilemap);
 
-		// save file if it is open
-		let active_view = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (active_view) {
-			await active_view.save();
-		}
-
-
-		let cache_string: string = await this.app.vault.adapter.read(cache);
-		let cache_obj = JSON.parse(cache_string);
-		let link_to_self = false;
-		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
-		let filtered_filelist: TFile[] = [];
-		let includePaths: string[];
-		if (this.settings.includePaths == "") {
-			includePaths = [];
-		}
-		else {
-			includePaths = this.settings.includePaths.split("\n");
-		}
-
-		// if include paths is empty, include all files
-		// otherwise only add files that are prefixed by one of the include paths
-		if (includePaths.length > 0) {
-			for (let file of filelist) {
-				for (let path of includePaths) {
-					if (file.path.startsWith(path)) {
-						filtered_filelist.push(file);
-						break;
-					}
-				}
-			}
-			filelist = filtered_filelist;
-		}
-
-		let tfilemap: { [key: string]: TFile } = {};
-		for (let file of filelist) {
-			tfilemap[file.path] = file;
-		}
-		let file_paths: string[] = filelist.map(file => file.path);
-
-		let file_map: { [key: string]: string } = {};
-		for (let file of filelist) {
-			file_map[file.path] = await this.app.vault.cachedRead(file);
-		}
-		let wasm_vault: plugin.JsVault = plugin.JsVault.default();
-
-		let total_files = filelist.length;
-		let index = 1;
-		for (let file of filelist) {
-			wasm_vault.add_file(file.path, file_map[file.path]);
-			index++;
-		}
 
 		let files: plugin.JsFile[] = [];
 		for (let file_path of file_paths) {
 			files.push(wasm_vault.get_file(file_path));
 		}
-		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
+		// let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
 		let valid_file_paths: string[] = wasm_vault.get_valid_file_paths();
 		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
-		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, settings_obj);
-
-		let byte_increament_map: { [key: string]: number } = {};
+		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, this.settings.caseInsensitive);
 
 		let valid_files_len = valid_files.length;
 		let valid_index = 1;
+
+		this.validate_cache(valid_file_paths);
+
 		for (let file_path of valid_file_paths) {
-			// if file is in cache, is up to date, and has no links, skip
-			// tfilemap[file_path].stat.mtime; <= cached last modified time
-			if (cache_obj[file_path] && cache_obj[file_path]['links'].length == 0 && tfilemap[file_path].stat.mtime <= cache_obj[file_path]['time']) {
-				console.log(`(${valid_index} / ${valid_files_len}) up to date ` + file_path);
-				valid_index++;
-				continue;
-			}
-
-			let file: plugin.JsFile = wasm_vault.get_file(file_path);
-			let file_links: plugin.JsLink[];
-
-			if (cache_obj[file_path]) {
-				let last_modified = cache_obj[file_path]['time'];
-				let file_last_modified = tfilemap[file_path].stat.mtime;
-				// if last modified time is the same or earlier as cache
-				if (file_last_modified <= last_modified) {
-					let file_links_serialized: string[] = cache_obj[file_path]['links'];
-					file_links = file_links_serialized.map(link_serialized => new plugin.JsLink(link_serialized));
-				}
-				else {
-					file_links = link_finder.find_links(file);
-				}
-			}
-			else {
-				file_links = link_finder.find_links(file);
-			}
-			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
-			new Notice(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
+			await this.process_file(file_path, tfilemap, link_finder, wasm_vault, alias_map, valid_index, valid_files_len, true);
 			valid_index++;
-			let remaining_links: string[] = []
-			for (let link of file_links) {
-				let file_increment: number = 0;
-				if (byte_increament_map[file_path]) {
-					file_increment = byte_increament_map[file_path];
-				}
-				let slice_start = file_increment + link.get_start();
-				let slice_end = file_increment + link.get_end();
-				let source = link.get_source();
-				let target = link.get_target();
-				let content = file_map[source];
-
-				let encoder = new TextEncoder();
-				let decoder = new TextDecoder();
-				let byteArray = encoder.encode(content);
-
-				let content_as_bytes = encoder.encode(content);
-
-
-				let slicedArray = byteArray.slice(slice_start, slice_end);
-				let slice_str = decoder.decode(slicedArray);
-				let replace_str = `[[${target}|${slice_str}]]`;
-
-				let replaced_as_bytes = encoder.encode(replace_str);
-				let increment = replaced_as_bytes.length - (slice_end - slice_start);
-				let color = this.settings.color;
-				let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${slice_str}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
-				let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${slice_str}]]` + decoder.decode(content_as_bytes.slice(slice_end));
-
-				let file_change: FileChange = {
-					file_path: source,
-					new_content: new_content,
-					colored_content: colored_content
-				}
-				let modal = new ParseModal(this, file_change);
-				modal.open();
-
-				await modal.wait_for_submit();
-
-				if (modal.accepted) {
-					let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
-					file_map[source] = new_content;
-
-					await this.app.vault.process(tfile, () => new_content);
-					if (byte_increament_map[source]) {
-						byte_increament_map[source] += increment;
-					} else {
-						byte_increament_map[source] = increment;
-					}
-				}
-
-				if (modal.declined) {
-					let json_link_serialized = link.serialize();
-					remaining_links.push(json_link_serialized);
-				}
-			}
-			cache_obj[file_path] = {
-				'time': tfilemap[file_path].stat.mtime,
-				'links': remaining_links
-			}
-			await this.app.vault.adapter.write(cache, JSON.stringify(cache_obj));
 		}
 	}
 
 	async run_linker_on_file(active_file_path: string) {
-		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
-		// if cache file does not exist, create it
-		if (!await this.app.vault.adapter.exists(cache)) {
-			await this.app.vault.adapter.write(cache, '{}');
-		}
+		await this.save_active_file();
 
-		// save file if it is open
-		let active_view = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!active_view) {
-			return;
-		}
-		await active_view.save();
-
-		let cache_string: string = await this.app.vault.adapter.read(cache);
-		let cache_obj = JSON.parse(cache_string);
-		let link_to_self = false;
-		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
-		let filtered_filelist: TFile[] = [];
-		let includePaths: string[] = [];
-
-		let tfilemap: { [key: string]: TFile } = {};
-		for (let file of filelist) {
-			tfilemap[file.path] = file;
-		}
-		let file_paths: string[] = filelist.map(file => file.path);
-
-		let file_map: { [key: string]: string } = {};
-		for (let file of filelist) {
-			file_map[file.path] = await this.app.vault.cachedRead(file);
-		}
-		let wasm_vault: plugin.JsVault = plugin.JsVault.default();
-
-		let total_files = filelist.length;
-		let index = 1;
-		for (let file of filelist) {
-			wasm_vault.add_file(file.path, file_map[file.path]);
-			index++;
-		}
+		let tfilemap: { [key: string]: TFile } = await this.get_filemap();
+		let file_paths: string[] = Object.keys(tfilemap);
+		let wasm_vault: plugin.JsVault = await this.create_wasm_vault(tfilemap);
+		let alias_map: { [key: string]: string[] } = await this.get_alias_map(tfilemap);
 
 		let files: plugin.JsFile[] = [];
 		for (let file_path of file_paths) {
 			files.push(wasm_vault.get_file(file_path));
 		}
-		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
 		let valid_file_paths: string[] = wasm_vault.get_valid_file_paths();
 		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
-		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, settings_obj);
+		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, this.settings.caseInsensitive);
 
-		let byte_increament_map: { [key: string]: number } = {};
+		this.validate_cache(valid_file_paths);
 
-		valid_file_paths = [active_file_path];
-
-		let valid_files_len = valid_file_paths.length;
-		let valid_index = 1;
-
-		for (let file_path of valid_file_paths) {
-			// if file is in cache, is up to date, and has no links, skip
-			// tfilemap[file_path].stat.mtime; <= cached last modified time
-			if (cache_obj[file_path] && cache_obj[file_path]['links'].length == 0 && tfilemap[file_path].stat.mtime <= cache_obj[file_path]['time']) {
-				console.log(`(${valid_index} / ${valid_files_len}) up to date ` + file_path);
-				valid_index++;
-				continue;
-			}
-
-			let file: plugin.JsFile = wasm_vault.get_file(file_path);
-			let file_links: plugin.JsLink[];
-
-			if (cache_obj[file_path]) {
-				let last_modified = cache_obj[file_path]['time'];
-				let file_last_modified = tfilemap[file_path].stat.mtime;
-				// if last modified time is the same or earlier as cache
-				if (file_last_modified <= last_modified) {
-					let file_links_serialized: string[] = cache_obj[file_path]['links'];
-					file_links = file_links_serialized.map(link_serialized => new plugin.JsLink(link_serialized));
-				}
-				else {
-					file_links = link_finder.find_links(file);
-				}
-			}
-			else {
-				file_links = link_finder.find_links(file);
-			}
-			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
-			new Notice(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
-			valid_index++;
-			let remaining_links: string[] = []
-			for (let link of file_links) {
-				let file_increment: number = 0;
-				if (byte_increament_map[file_path]) {
-					file_increment = byte_increament_map[file_path];
-				}
-				let slice_start = file_increment + link.get_start();
-				let slice_end = file_increment + link.get_end();
-				let source = link.get_source();
-				let target = link.get_target();
-				let content = file_map[source];
-
-				let encoder = new TextEncoder();
-				let decoder = new TextDecoder();
-				let byteArray = encoder.encode(content);
-
-				let content_as_bytes = encoder.encode(content);
-
-				let slicedArray = byteArray.slice(slice_start, slice_end);
-				let slice_str = decoder.decode(slicedArray);
-				let replace_str = `[[${target}|${slice_str}]]`;
-
-				let replaced_as_bytes = encoder.encode(replace_str);
-				let increment = replaced_as_bytes.length - (slice_end - slice_start);
-				let color = this.settings.color;
-				let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${slice_str}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
-				let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${slice_str}]]` + decoder.decode(content_as_bytes.slice(slice_end));
-
-				let file_change: FileChange = {
-					file_path: source,
-					new_content: new_content,
-					colored_content: colored_content
-				}
-				let modal = new ParseModal(this, file_change);
-				modal.open();
-
-				await modal.wait_for_submit();
-
-				if (modal.accepted) {
-					let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
-					file_map[source] = new_content;
-
-					await this.app.vault.process(tfile, () => new_content);
-					if (byte_increament_map[source]) {
-						byte_increament_map[source] += increment;
-					} else {
-						byte_increament_map[source] = increment;
-					}
-				}
-
-				if (modal.declined) {
-					let json_link_serialized = link.serialize();
-					remaining_links.push(json_link_serialized);
-				}
-			}
-			cache_obj[file_path] = {
-				'time': tfilemap[file_path].stat.mtime,
-				'links': remaining_links
-			}
-			await this.app.vault.adapter.write(cache, JSON.stringify(cache_obj));
-		}
+		await this.process_file(active_file_path, tfilemap, link_finder, wasm_vault, alias_map, 1, 1, true);
 	}
 
 	async scan_vault() {
-		let cache: string = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer/cache.json';
-		// if cache file does not exist, create it
-		if (!await this.app.vault.adapter.exists(cache)) {
-			await this.app.vault.adapter.write(cache, '{}');
-		}
-		let link_to_self = false;
-		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
-		let filtered_filelist: TFile[] = [];
-		let includePaths: string[];
-		if (this.settings.includePaths == "") {
-			includePaths = [];
-		}
-		else {
-			includePaths = this.settings.includePaths.split("\n");
-		}
-
-		// if include paths is empty, include all files
-		// otherwise only add files that are prefixed by one of the include paths
-		if (includePaths.length > 0) {
-			for (let file of filelist) {
-				for (let path of includePaths) {
-					if (file.path.startsWith(path)) {
-						filtered_filelist.push(file);
-						break;
-					}
-				}
-			}
-			filelist = filtered_filelist;
-		}
-
-		let tfilemap: { [key: string]: TFile } = {};
-		for (let file of filelist) {
-			tfilemap[file.path] = file;
-		}
-		let file_paths: string[] = filelist.map(file => file.path);
-
-		let file_map: { [key: string]: string } = {};
-		for (let file of filelist) {
-			file_map[file.path] = await this.app.vault.cachedRead(file);
-		}
-		let wasm_vault: plugin.JsVault = plugin.JsVault.default();
-
-		let total_files = filelist.length;
-		let index = 1;
-		for (let file of filelist) {
-			wasm_vault.add_file(file.path, file_map[file.path]);
-			index++;
-		}
+		await this.save_active_file();
+		let tfilemap: { [key: string]: TFile } = await this.get_filtered_filemap();
+		let file_paths: string[] = Object.keys(tfilemap);
+		let wasm_vault: plugin.JsVault = await this.create_wasm_vault(tfilemap);
+		let alias_map: { [key: string]: string[] } = await this.get_alias_map(tfilemap);
 
 		let files: plugin.JsFile[] = [];
 		for (let file_path of file_paths) {
 			files.push(wasm_vault.get_file(file_path));
 		}
-		let settings_obj = new plugin.JsSettings(this.settings.caseInsensitive, link_to_self, this.settings.color);
 		let valid_file_paths: string[] = wasm_vault.get_valid_file_paths();
 		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
-		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, settings_obj);
+		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, this.settings.caseInsensitive);
 
 		let valid_files_len = valid_files.length;
 		let valid_index = 1;
-		for (let file_path of valid_file_paths) {
-			let cache_string: string = await this.app.vault.adapter.read(cache);
-			let cache_obj = JSON.parse(cache_string);
-			let file: plugin.JsFile = wasm_vault.get_file(file_path);
-			let file_links: plugin.JsLink[];
 
-			// if file is in cache
-			if (cache_obj[file_path]) {
-				let last_modified = cache_obj[file_path]['time'];
-				let file_last_modified = tfilemap[file_path].stat.mtime;
-				// if last modified time is the same or earlier as cache
-				if (file_last_modified <= last_modified) {
-					let file_links_serialized: string[] = cache_obj[file_path]['links'];
-					file_links = file_links_serialized.map(link_serialized => new plugin.JsLink(link_serialized));
-				}
-				else {
-					file_links = link_finder.find_links(file);
-				}
-			}
-			else {
-				file_links = link_finder.find_links(file);
-			}
-			console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
-			new Notice(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
+		this.validate_cache(valid_file_paths);
+
+		for (let file_path of valid_file_paths) {
+			await this.process_file(file_path, tfilemap, link_finder, wasm_vault, alias_map, valid_index, valid_files_len, false);
 			valid_index++;
-			let remaining_links: string[] = []
-			for (let link of file_links) {
-				let json_link_serialized = link.serialize();
-				remaining_links.push(json_link_serialized);
-			}
-			cache_obj[file_path] = {
-				'time': tfilemap[file_path].stat.mtime,
-				'links': remaining_links
-			}
-			await this.app.vault.adapter.write(cache, JSON.stringify(cache_obj));
 		}
+	}
+
+	async get_invalid_notes() {
+		await this.save_active_file();
+		let tfilemap: { [key: string]: TFile } = await this.get_filtered_filemap();
+		let file_paths: string[] = Object.keys(tfilemap);
+		let wasm_vault: plugin.JsVault = await this.create_wasm_vault(tfilemap);
+
+		let invalid_files: plugin.JsFileError[] = wasm_vault.get_invalid_files();
+		let paths: string[] = invalid_files.map(file => file.get_path());
+		let errors: string[] = invalid_files.map(file => file.get_error());
+		let modal = new ParseErrorModal(this, paths, errors);
+		modal.open();
 	}
 
 	async loadSettings() {
@@ -504,6 +189,262 @@ export default class RustPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	async get_aliases(file_path: string): Promise<string[]> {
+		let file = this.app.vault.getAbstractFileByPath(file_path) as TFile;
+		let frontmatter = (await this.app.metadataCache.getFileCache(file))?.frontmatter;
+		let aliases: string[] = [];
+		if (frontmatter) {
+			if (frontmatter.aliases) {
+				aliases = frontmatter.aliases;
+			}
+		}
+		let basename = file.basename;
+		if (!aliases.includes(basename)) {
+			aliases.push(basename);
+		}
+		return aliases;
+	}
+
+	async validate_cache(valid_file_paths: string[]) {
+		this.cache_obj = JSON.parse(await this.app.vault.adapter.read(this.cache_path));
+		let alias_map: { [key: string]: string[] } = {};
+
+		let index = 0;
+		let valid_files_len = valid_file_paths.length;
+		for (index = 0; index < valid_files_len; index++) {
+			let file_path = valid_file_paths[index];
+			alias_map[file_path] = await this.get_aliases(file_path);
+		}
+		let cache_valid = true;
+		for (index = 0; index < valid_files_len; index++) {
+			let file_path = valid_file_paths[index];
+			// if all current file aliases match the cache do nothing, otherwise clear cache
+			if (this.cache_obj[file_path] == undefined || this.cache_obj[file_path]['aliases'] == undefined) {
+				cache_valid = false;
+				break;
+			}
+			let cache_aliases_set = new Set(this.cache_obj[file_path]['aliases']);
+			let current_aliases = alias_map[file_path];
+			for (let alias of current_aliases) {
+				// assert alias is in cache
+				if (!cache_aliases_set.has(alias)) {
+					cache_valid = false;
+					break;
+				}
+			}
+		}
+
+		if (cache_valid) {
+			console.log("Cache is valid");
+		}
+		else {
+			console.log("Cache is invalid");
+			this.cache_obj = {};
+			await this.app.vault.adapter.write(this.cache_path, JSON.stringify(this.cache_obj));
+		}
+
+		for (index = 0; index < valid_files_len; index++) {
+			let file_path = valid_file_paths[index];
+			if (!this.cache_obj[file_path]) {
+				this.cache_obj[file_path] = {};
+			}
+			if (!this.cache_obj[file_path]['aliases']) {
+				this.cache_obj[file_path]['aliases'] = {};
+			}
+			this.cache_obj[file_path]['aliases'] = alias_map[file_path]
+		}
+
+		await this.app.vault.adapter.write(this.cache_path, JSON.stringify(this.cache_obj));
+	}
+
+	async get_links(tfile: TFile, link_finder: plugin.JsLinkFinder, file: plugin.JsFile): Promise<plugin.JsLink[]> {
+		let file_links: plugin.JsLink[];
+		let cache_string: string = await this.app.vault.adapter.read(this.cache_path);
+		let cache_obj = JSON.parse(cache_string);
+		let file_path = tfile.path;
+		if (cache_obj[file_path]) {
+			let last_modified = cache_obj[file_path]['time'];
+			let file_last_modified = tfile.stat.mtime;
+			// if last modified time is the same or earlier as cache
+			if (file_last_modified <= last_modified) {
+				let file_links_serialized: string[] = cache_obj[file_path]['links'];
+				file_links = file_links_serialized.map(link_serialized => new plugin.JsLink(link_serialized));
+			}
+			else {
+				file_links = link_finder.find_links(file);
+			}
+		}
+		else {
+			file_links = link_finder.find_links(file);
+		}
+		return file_links;
+	}
+
+	async save_active_file() {
+		let active_view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (active_view) {
+			await active_view.save();
+		}
+	}
+
+	async validate_file(tfile: TFile): Promise<boolean> {
+		let file_path = tfile.path;
+		let valid: boolean = this.cache_obj[file_path] && this.cache_obj[file_path]['links'] && this.cache_obj[file_path]['links'].length == 0 && tfile.stat.mtime <= this.cache_obj[file_path]['time'];
+		return valid;
+	}
+
+
+	async get_filemap(): Promise<{ [key: string]: TFile }> {
+		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
+		let filemap: { [key: string]: TFile } = {};
+		for (let file of filelist) {
+			filemap[file.path] = file;
+		}
+
+		return filemap;
+	}
+	async get_filtered_filemap(): Promise<{ [key: string]: TFile }> {
+		// getting the include paths
+		let includePaths: string[];
+		if (this.settings.includePaths == "") {
+			includePaths = [];
+		}
+		else {
+			includePaths = this.settings.includePaths.split("\n");
+		}
+
+		// if include paths is empty, include all files
+		if (includePaths.length == 0) {
+			return this.get_filemap()
+		}
+		// otherwise only add files that are prefixed by one of the include paths
+		let filelist: TFile[] = this.app.vault.getMarkdownFiles();
+		let filtered_filelist: TFile[] = [];
+		for (let file of filelist) {
+			for (let path of includePaths) {
+				if (file.path.startsWith(path)) {
+					filtered_filelist.push(file);
+					break;
+				}
+			}
+		}
+		let filtered_filemap: { [key: string]: TFile } = {};
+		for (let file of filtered_filelist) {
+			filtered_filemap[file.path] = file;
+		}
+		return filtered_filemap;
+	}
+	async get_alias_map(filemap: { [key: string]: TFile }): Promise<{ [key: string]: string[] }> {
+		let alias_map: { [key: string]: string[] } = {};
+		let filelist: TFile[] = Object.values(filemap);
+		for (let file of filelist) {
+			alias_map[file.path] = await this.get_aliases(file.path);
+		}
+		return alias_map;
+	}
+	async create_wasm_vault(filemap: { [key: string]: TFile }): Promise<plugin.JsVault> {
+		let wasm_vault: plugin.JsVault = plugin.JsVault.default();
+		let index = 1;
+		for (let file of Object.values(filemap)) {
+			wasm_vault.add_file(file.path, await this.app.vault.cachedRead(file));
+			index++;
+		}
+		return wasm_vault;
+	}
+	async get_parsed_file(path: string, vault: plugin.JsVault): Promise<plugin.JsFile> {
+		let file = vault.get_file(path);
+		return file;
+	}
+
+	async process_file(file_path: string, tfilemap: { [key: string]: TFile }, link_finder: plugin.JsLinkFinder, wasm_vault: plugin.JsVault, alias_map: { [key: string]: string[] }, valid_index: number, valid_files_len: number, perform_link: boolean) {
+		// if file is open get content from editor, otherwise get content from file
+		if (await this.validate_file(tfilemap[file_path])) {
+			console.log(`(${valid_index} / ${valid_files_len}) up to date ` + file_path);
+			valid_index++;
+			return;
+		}
+		let byte_increament: number = 0;
+		let file: plugin.JsFile = wasm_vault.get_file(file_path);
+		let file_links: plugin.JsLink[] = await this.get_links(tfilemap[file_path], link_finder, file);
+		console.log(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
+		new Notice(`(${valid_index} / ${valid_files_len}) Found Links for ` + file_path);
+		valid_index++;
+		let remaining_links: string[] = []
+		let file_content: string = await this.app.vault.cachedRead(tfilemap[file_path]);
+		let file_open: boolean = false;
+		let view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (view) {
+			if (view.file.path == file_path) {
+				file_open = true;
+			}
+		}
+		if (view && file_open) {
+			file_content = view.editor.getValue();
+		}
+		for (let link of file_links) {
+			let file_increment: number = 0;
+			let slice_start = file_increment + link.get_start();
+			let slice_end = file_increment + link.get_end();
+			let source = link.get_source();
+			let target = link.get_target();
+
+
+
+			let encoder = new TextEncoder();
+			let decoder = new TextDecoder();
+			let byteArray = encoder.encode(file_content);
+
+			let content_as_bytes = encoder.encode(file_content);
+
+
+			let slicedArray = byteArray.slice(slice_start, slice_end);
+			let slice_str = decoder.decode(slicedArray);
+			let replace_str = `[[${target}|${slice_str}]]`;
+
+			let replaced_as_bytes = encoder.encode(replace_str);
+			let increment = replaced_as_bytes.length - (slice_end - slice_start);
+			let color = this.settings.color;
+			let colored_content = decoder.decode(content_as_bytes.slice(0, slice_start)) + `<span style="color:${color}">\\[\\[${target}\\|${slice_str}\\]\\]</span>` + decoder.decode(content_as_bytes.slice(slice_end));
+			let new_content: string = decoder.decode(content_as_bytes.slice(0, slice_start)) + `[[${target}|${slice_str}]]` + decoder.decode(content_as_bytes.slice(slice_end));
+
+			let file_change: FileChange = {
+				file_path: source,
+				new_content: new_content,
+				colored_content: colored_content
+			}
+			if (perform_link) {
+				let modal = new ParseModal(this, file_change);
+				modal.open();
+
+				await modal.wait_for_submit();
+
+				if (modal.accepted) {
+					let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
+					file_content = new_content;
+
+					await this.app.vault.process(tfile, () => new_content);
+					byte_increament += increment;
+
+				}
+
+				if (modal.declined) {
+					let json_link_serialized = link.serialize();
+					remaining_links.push(json_link_serialized);
+				}
+			} else {
+				let json_link_serialized = link.serialize();
+				remaining_links.push(json_link_serialized);
+			}
+
+		}
+		this.cache_obj[file_path] = {
+			'time': tfilemap[file_path].stat.mtime,
+			'links': remaining_links,
+			'aliases': alias_map[file_path]
+		}
+		await this.app.vault.adapter.write(this.cache_path, JSON.stringify(this.cache_obj));
 	}
 }
 
@@ -553,6 +494,36 @@ class ParseModal extends Modal {
 			await new Promise((resolve) => setTimeout(resolve, 100));
 		}
 	}
+
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+}
+
+class ParseErrorModal extends Modal {
+	plugin: RustPlugin;
+	paths: string[];
+	errors: string[];
+
+	constructor(plugin: RustPlugin, paths: string[], errors: string[]) {
+		super(plugin.app);
+		this.plugin = plugin;
+		this.paths = paths;
+		this.errors = errors;
+	}
+
+	async onOpen() {
+		const { contentEl } = this;
+		for (let index = 0; index < this.paths.length; index++) {
+			let path = this.paths[index];
+			let error = this.errors[index];
+			contentEl.createEl('h2', { text: path });
+			contentEl.createEl('p', { text: error });
+		}
+	}
+
 
 
 	onClose() {

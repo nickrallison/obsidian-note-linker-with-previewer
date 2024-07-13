@@ -13,6 +13,6 @@ pub enum Error {
     #[error(transparent)]
     Regex(#[from] regex::Error),
 
-    #[error("parse failure on file: {}", .0.display())]
+    #[error("{}", .1)]
     ParseError(PathBuf, String),
 }

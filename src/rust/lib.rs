@@ -22,62 +22,9 @@ mod settings;
 mod utils;
 mod vault;
 
+// DO NOT REMOVE, PLUGIN DOES NOT LOAD WITHOUT THIS
 #[wasm_bindgen]
-pub struct ExampleCommand {
-    id: JsString,
-    name: JsString,
-    vault: obsidian::Vault,
-}
-
-#[wasm_bindgen]
-impl ExampleCommand {
-    #[wasm_bindgen(getter)]
-    pub fn id(&self) -> JsString {
-        self.id.clone()
-    }
-
-    #[wasm_bindgen(setter)]
-    pub fn set_id(&mut self, id: &str) {
-        self.id = JsString::from(id)
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn name(&self) -> JsString {
-        self.name.clone()
-    }
-
-    #[wasm_bindgen(setter)]
-    pub fn set_name(&mut self, name: &str) {
-        self.name = JsString::from(name)
-    }
-
-    pub fn callback(&self) {
-        let num_files = &self.vault.getFiles().len();
-        let message = format!("Number of files: {}", num_files);
-        obsidian::Notice::new(&message);
-    }
-}
-
-// #[wasm_bindgen]
-// pub fn parse_file_to_str(content: JsString) -> JsString {
-//     let content: String = content.as_string().unwrap();
-//     let parsed: Result<parser::MDFile> = parser::parse_md_file_wrapper(content);
-
-//     match parsed {
-//         Ok(_) => JsString::from(format!("{:?}", parsed)),
-//         Err(e) => JsString::from(format!("Error: {}", e)),
-//     }
-// }
-
-#[wasm_bindgen]
-pub fn onload(plugin: &obsidian::Plugin) {
-    // let cmd = ExampleCommand {
-    //     id: JsString::from("example"),
-    //     name: JsString::from("Example"),
-    //     vault: plugin.get_app().get_vault(),
-    // };
-    // plugin.addCommand(JsValue::from(cmd));
-}
+pub fn onload(plugin: &obsidian::Plugin) {}
 
 // Public Types and Public Functions
 
@@ -137,6 +84,44 @@ impl JsVault {
             .map(|path| JsString::from(format!("{}", path.display())))
             .collect()
     }
+    #[wasm_bindgen]
+    pub fn get_invalid_files(&self) -> Vec<JsFileError> {
+        self.files
+            .invalid_files
+            .iter()
+            .map(|(path, error)| {
+                (JsFileError::new(
+                    JsString::from(format!("{}", path.display())),
+                    JsString::from(format!("{}", error)),
+                ))
+            })
+            .collect::<Vec<JsFileError>>()
+    }
+}
+
+#[wasm_bindgen]
+pub struct JsFileError {
+    path: JsString,
+    error: JsString,
+}
+
+#[wasm_bindgen]
+impl JsFileError {
+    pub fn new(path: JsString, error: JsString) -> JsFileError {
+        JsFileError {
+            path: path.clone(),
+            error: error.clone(),
+        }
+    }
+    #[wasm_bindgen]
+    pub fn get_path(&self) -> JsString {
+        self.path.clone()
+    }
+
+    #[wasm_bindgen]
+    pub fn get_error(&self) -> JsString {
+        self.error.clone()
+    }
 }
 
 #[wasm_bindgen]
@@ -156,13 +141,13 @@ impl JsLinkFinder {
     pub fn new(
         file_paths: Vec<JsString>,
         files: Vec<JsFile>,
-        settings: JsSettings,
+        case_insensitive: JsValue,
     ) -> JsLinkFinder {
         let file_paths: Vec<String> = file_paths.iter().map(|file| f!("{}", file)).collect();
         let files: Vec<&crate::vault::File> = files.iter().map(|file| &file.file).collect();
-        let settings = settings.settings;
+        let case_insensitive = case_insensitive.as_bool().unwrap_or(true);
 
-        let link_finder = LinkFinderWrapper::new(file_paths, files, settings);
+        let link_finder = LinkFinderWrapper::new(file_paths, files, case_insensitive);
 
         JsLinkFinder { link_finder }
     }
@@ -175,56 +160,6 @@ impl JsLinkFinder {
             .map(|link| JsLink { link: link.clone() })
             .collect()
     }
-}
-
-#[wasm_bindgen]
-pub struct JsSettings {
-    settings: crate::settings::Settings,
-}
-
-#[wasm_bindgen]
-impl JsSettings {
-    #[wasm_bindgen(constructor)]
-    pub fn new(case_insensitive: bool, link_to_self: bool, color: String) -> JsSettings {
-        let settings = crate::settings::Settings::new(case_insensitive, link_to_self, color);
-        JsSettings { settings }
-    }
-
-    #[wasm_bindgen]
-    pub fn default() -> Self {
-        let settings = crate::settings::Settings::default();
-        JsSettings { settings }
-    }
-
-    #[wasm_bindgen]
-    pub fn get_case_insensitive(&self) -> bool {
-        self.settings.case_insensitive
-    }
-
-    #[wasm_bindgen]
-    pub fn get_link_to_self(&self) -> bool {
-        self.settings.link_to_self
-    }
-
-    #[wasm_bindgen]
-    pub fn get_color(&self) -> JsString {
-        JsString::from(self.settings.color.clone())
-    }
-
-    // #[wasm_bindgen]
-    // pub fn set_case_insensitive(&mut self, case_insensitive: bool) {
-    //     self.settings.case_insensitive = case_insensitive;
-    // }
-
-    // #[wasm_bindgen]
-    // pub fn set_link_to_self(&mut self, link_to_self: bool) {
-    //     self.settings.link_to_self = link_to_self;
-    // }
-
-    // #[wasm_bindgen]
-    // pub fn set_color(&mut self, color: JsString) {
-    //     self.settings.color = f!("{}", color);
-    // }
 }
 
 #[wasm_bindgen]
@@ -265,8 +200,8 @@ impl JsLink {
 
 // Interface Types
 pub struct VaultWrapper {
-    valid_files: HashMap<PathBuf, crate::vault::File>,
-    invalid_files: Vec<(PathBuf, Error)>,
+    pub valid_files: HashMap<PathBuf, crate::vault::File>,
+    pub invalid_files: Vec<(PathBuf, Error)>,
 }
 
 impl VaultWrapper {
@@ -319,7 +254,7 @@ impl LinkFinderWrapper {
     pub fn new(
         file_paths: Vec<String>,
         files: Vec<&crate::vault::File>,
-        settings: crate::settings::Settings,
+        case_insensitive: bool,
     ) -> LinkFinderWrapper {
         let file_paths: Vec<PathBuf> = file_paths
             .iter()
@@ -331,7 +266,7 @@ impl LinkFinderWrapper {
             .map(|file: &&crate::vault::File| *file)
             .collect();
 
-        let link_finder = link_finder::LinkFinder::new(file_refs, settings);
+        let link_finder = link_finder::LinkFinder::new(file_refs, case_insensitive);
         LinkFinderWrapper { link_finder }
     }
 
@@ -377,7 +312,7 @@ pub mod wasm_test {
 
     #[test]
     fn wasm_alan_turing_test() {
-        let settings = crate::settings::Settings::new(true, false, "red".to_string());
+        // let settings = crate::settings::Settings::new(true, "red".to_string());
         let file_1_path: PathBuf = PathBuf::from(FILE_1_PATH);
         let file_2_path: PathBuf = PathBuf::from(FILE_2_PATH);
         let file1 = crate::vault::File::new(file_1_path, FILE_1_CONT.to_string()).unwrap();
@@ -386,7 +321,7 @@ pub mod wasm_test {
         let link_finder = LinkFinderWrapper::new(
             vec![FILE_1_PATH.to_string(), FILE_2_PATH.to_string()],
             files,
-            settings,
+            true,
         );
         let links = link_finder.find_links(file1);
         let links_expected: Vec<crate::link_finder::Link> = vec![crate::link_finder::Link {
@@ -400,7 +335,7 @@ pub mod wasm_test {
 
     #[test]
     fn wasm_turing_machine_test() {
-        let settings = crate::settings::Settings::new(true, false, "red".to_string());
+        // let settings = crate::settings::Settings::new(true, "red".to_string());
         let file_1_path: PathBuf = PathBuf::from(FILE_1_PATH);
         let file_2_path: PathBuf = PathBuf::from(FILE_2_PATH);
         let file1 = crate::vault::File::new(file_1_path, FILE_1_CONT.to_string()).unwrap();
@@ -409,7 +344,7 @@ pub mod wasm_test {
         let link_finder = LinkFinderWrapper::new(
             vec![FILE_1_PATH.to_string(), FILE_2_PATH.to_string()],
             files,
-            settings,
+            true,
         );
         let links = link_finder.find_links(file2);
         /*

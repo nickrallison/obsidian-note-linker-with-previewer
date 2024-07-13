@@ -7,7 +7,7 @@ use crate::parser::ParsedMDFile;
 use crate::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct File {
+pub struct File {
     pub path: PathBuf,
     pub contents: ParsedMDFile,
     pub original: String,
