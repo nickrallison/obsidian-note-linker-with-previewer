@@ -85,7 +85,7 @@ I am so sorry for the frustration. You have 2 options.
 	4. If you do this, **Make sure to add a newline at the end of your file manually**, otherwise it may not parse
 2. If you think you have found a bug, please open a pull request with the following information. I will do my best to fix it as fast as I can
 	1. The version of your plugin
-	2. The Contents of the file you are parsing
+	2. The contents of the file you are parsing
 
 
 ## Developement
