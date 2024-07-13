@@ -51,17 +51,17 @@ Code Blocks and Latex blocks must start with a new line and end with a new line.
 
 Bad:
 ```
-         \`\`\`c
+         ``````c
 #include <stdio.h>
 #include <stdlib.h>
-         \`\`\`
+         ``````
 ```
-Good
+Good:
 ```
-\`\`\`c
+``````c
 #include <stdio.h>
 #include <stdlib.h>
-\`\`\`
+``````
 ```
 
 ##### Termination
