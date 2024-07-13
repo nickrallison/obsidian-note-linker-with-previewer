@@ -15,17 +15,20 @@ This is a plugin to find links between your notes. That's it, that's all it does
 
 ### Directions
 
-You have 4 commands you can use
+You have several commands you can use
 1. Scan Vault
 	- I recommend running this first & letting it complete. This searches for links and records them without writing any files. Subsequent links runs will be much faster. The saved results should also persist when you close the app
 2. Link Vault
 	- This command links every markdown file in your vault
- 	- If you specify an include filter, it only searches files matching one or more of those filters
+	- If you specify an include filter, it only searches files matching one or more of those filters
 3. Link Current Note
 	- This only links your current note
- 	- This bypasses the filter setting.
+	- This bypasses the filter setting
 4. Get Invalid Notes
+	- This shows all of the files which had an error and are not actively being scanned
 	- **This one is important. Read the section below**
+5. Reset Cache
+	- This is helpful if you are getting weird linking behavior, it hard resets your cache so when it searches again, it searches from scratch.
 
 ### Parsing & Invalid Notes
 
