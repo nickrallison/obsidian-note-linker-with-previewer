@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-note-linker-with-previewer",
+	"name": "note-linker-with-previewer",
 	"description": "This is a note linker plugin",
 	"version": "1.0.0",
 	"main": "main.js",
