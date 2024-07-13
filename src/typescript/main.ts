@@ -124,7 +124,7 @@ export default class RustPlugin extends Plugin {
 		let valid_files_len = valid_files.length;
 		let valid_index = 1;
 
-		this.validate_cache(valid_file_paths);
+		this.validate_cache(valid_file_paths, tfilemap);
 
 		for (let file_path of valid_file_paths) {
 			await this.process_file(file_path, tfilemap, link_finder, wasm_vault, alias_map, valid_index, valid_files_len, true);
@@ -148,7 +148,7 @@ export default class RustPlugin extends Plugin {
 		let valid_files: plugin.JsFile[] = valid_file_paths.map(path => wasm_vault.get_file(path));
 		let link_finder: plugin.JsLinkFinder = new plugin.JsLinkFinder(valid_file_paths, valid_files, this.settings.caseInsensitive);
 
-		this.validate_cache(valid_file_paths);
+		this.validate_cache(valid_file_paths, tfilemap);
 
 		await this.process_file(active_file_path, tfilemap, link_finder, wasm_vault, alias_map, 1, 1, true);
 	}
@@ -171,7 +171,7 @@ export default class RustPlugin extends Plugin {
 		let valid_files_len = valid_files.length;
 		let valid_index = 1;
 
-		this.validate_cache(valid_file_paths);
+		this.validate_cache(valid_file_paths, tfilemap);
 
 		for (let file_path of valid_file_paths) {
 			await this.process_file(file_path, tfilemap, link_finder, wasm_vault, alias_map, valid_index, valid_files_len, false);
@@ -200,8 +200,7 @@ export default class RustPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
-	async get_aliases(file_path: string): Promise<string[]> {
-		let file = this.app.vault.getAbstractFileByPath(file_path) as TFile;
+	async get_aliases(file: TFile): Promise<string[]> {
 		let frontmatter = (await this.app.metadataCache.getFileCache(file))?.frontmatter;
 		let aliases: string[] = [];
 		if (frontmatter) {
@@ -216,7 +215,7 @@ export default class RustPlugin extends Plugin {
 		return aliases;
 	}
 
-	async validate_cache(valid_file_paths: string[]) {
+	async validate_cache(valid_file_paths: string[], tfilemap: { [key: string]: TFile }) {
 		this.cache_obj = JSON.parse(await this.app.vault.adapter.read(this.cache_path));
 		let alias_map: { [key: string]: string[] } = {};
 
@@ -224,7 +223,7 @@ export default class RustPlugin extends Plugin {
 		let valid_files_len = valid_file_paths.length;
 		for (index = 0; index < valid_files_len; index++) {
 			let file_path = valid_file_paths[index];
-			alias_map[file_path] = await this.get_aliases(file_path);
+			alias_map[file_path] = await this.get_aliases(tfilemap[file_path]);
 		}
 		let cache_valid = true;
 		for (index = 0; index < valid_files_len; index++) {
@@ -349,7 +348,7 @@ export default class RustPlugin extends Plugin {
 		let alias_map: { [key: string]: string[] } = {};
 		let filelist: TFile[] = Object.values(filemap);
 		for (let file of filelist) {
-			alias_map[file.path] = await this.get_aliases(file.path);
+			alias_map[file.path] = await this.get_aliases(file);
 		}
 		return alias_map;
 	}
@@ -430,7 +429,7 @@ export default class RustPlugin extends Plugin {
 				await modal.wait_for_submit();
 
 				if (modal.accepted) {
-					let tfile: TFile = this.app.vault.getAbstractFileByPath(source) as TFile;
+					let tfile: TFile = tfilemap[source];
 					file_content = new_content;
 
 					await this.app.vault.process(tfile, () => new_content);
