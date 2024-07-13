@@ -15,7 +15,7 @@ This is a plugin to find links between your notes. That's it, that's all it does
 
 ### Directions
 
-You have 3 commands you can use
+You have 4 commands you can use
 1. Scan Vault
 	- I recommend running this first & letting it complete. This searches for links and records them without writing any files. Subsequent links runs will be much faster. The saved results should also persist when you close the app
 2. Link Vault
@@ -24,6 +24,68 @@ You have 3 commands you can use
 3. Link Current Note
 	- This only links your current note
  	- This bypasses the filter setting.
+4. Get Invalid Notes
+	- **This one is important. Read the section below**
+
+### Parsing & Invalid Notes
+
+Since a parser is used to link your notes, it won't suggest links inside of code blocks, or other obviously wrong sections. That comes with a downside, if your notes are not properly formatted, they will not parse and as a result, they will not be linked, and nothing will link to them.
+
+#### How Can You Avoid This
+
+##### Obvious bad formatting will cause an error:
+eg: "[[Vector.md|Binormal]] Vector.md|Binormal]]"
+##### Escape Characters
+The follow characters have to be escaped when used in normal text sections:
+	- "*"
+	- ">"
+	- "["
+	- "]"
+	- "$"
+
+##### Code Blocks
+Code Blocks and Latex blocks must start with a new line and end with a new line. Whitespaces at the beginning of a line cause parsing to fail
+
+Bad:
+         ```c
+#include <stdio.h>
+#include <stdlib.h>
+         ```
+Good
+```c
+#include <stdio.h>
+#include <stdlib.h>
+```
+
+##### Termination
+
+Special characters must be terminated.
+
+Good:
+This is **Impotant** text
+
+Bad:
+This is **Impotant text
+
+Good:
+This is a [[link]] to a page
+
+Bad:
+This is a [[link to a page
+This is a link]] to a page
+
+#### My Notes are Still Getting an Error
+
+I am so sorry for the frustration. You have 2 options.
+
+1. You can open an interactive viewer of how your file is being parsed, and debug it yourself.
+	1. You can find it [here](https://pest.rs/#editor). It needs a [grammar](https://github.com/nickrallison/obsidian-note-linker-with-previewer/blob/main/src/rust/parser/md.pest), and an input file.
+	2. Give it the contents of the grammer and the contents of your failing file
+	3. Choose to parse it into an md_file under the input mode
+	4. If you do this, **Make sure to add a newline at the end of your file manually**, otherwise it may not parse
+2. If you think you have found a bug, please open a pull request with the following information. I will do my best to fix it as fast as I can
+	1. The version of your plugin
+	2. The Contents of the file you are parsing
 
 
 ## Developement
