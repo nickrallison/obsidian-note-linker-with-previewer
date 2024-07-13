@@ -91,6 +91,16 @@ export default class RustPlugin extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: "debug",
+			name: "Debug",
+			callback: async () => {
+				let config_dir = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer';
+				let cache_files = await this.app.vault.adapter.list(config_dir);
+				console.log(cache_files);
+			}
+		});
+
 		this.addSettingTab(new RustPluginSettingTab(this.app, this));
 	}
 
@@ -452,7 +462,7 @@ export default class RustPlugin extends Plugin {
 		await this.app.vault.adapter.write(this.cache_path, JSON.stringify(this.cache_obj));
 	}
 	async read_cache() {
-		if (!this.app.vault.adapter.exists(this.cache_path)) {
+		if (!await this.app.vault.adapter.exists(this.cache_path)) {
 			await this.app.vault.adapter.write(this.cache_path, "{}");
 		}
 		await this.app.vault.adapter.read(this.cache_path);
