@@ -91,15 +91,15 @@ export default class RustPlugin extends Plugin {
 			}
 		});
 
-		this.addCommand({
-			id: "debug",
-			name: "Debug",
-			callback: async () => {
-				let config_dir = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer';
-				let cache_files = await this.app.vault.adapter.list(config_dir);
-				console.log(cache_files);
-			}
-		});
+		// this.addCommand({
+		// 	id: "debug",
+		// 	name: "Debug",
+		// 	callback: async () => {
+		// 		let config_dir = this.app.vault.configDir + '/plugins/obsidian-note-linker-with-previewer';
+		// 		let cache_files = await this.app.vault.adapter.list(config_dir);
+		// 		console.log(cache_files);
+		// 	}
+		// });
 
 		this.addSettingTab(new RustPluginSettingTab(this.app, this));
 	}
