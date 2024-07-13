@@ -44,19 +44,6 @@ export default class RustPlugin extends Plugin {
 		// DO NOT REMOVE, PLUGIN DOES NOT LOAD WITHOUT IT
 		await plugin.default(Promise.resolve(buffer));
 
-		// Cleaning the cache
-		if (!await this.app.vault.adapter.exists(this.cache_path)) {
-			await this.app.vault.adapter.write(this.cache_path, '{}');
-		}
-		let cache_string: string = await this.app.vault.adapter.read(this.cache_path);
-		let cache_obj = JSON.parse(cache_string);
-		for (let key in cache_obj) {
-			if (!this.app.vault.getAbstractFileByPath(key)) {
-				delete cache_obj[key];
-			}
-		}
-		await this.app.vault.adapter.write(this.cache_path, JSON.stringify(cache_obj));
-
 		this.addCommand({
 			id: "link_current_file",
 			name: "Link Current Note",
