@@ -92,6 +92,15 @@ export default class RustPlugin extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: "reset_cache",
+			name: "Reset Cache",
+			callback: () => {
+				this.app.vault.adapter.write(this.cache_path, '{}');
+				this.cache_obj = {};
+			}
+		});
+
 		this.addSettingTab(new RustPluginSettingTab(this.app, this));
 	}
 
