@@ -50,19 +50,20 @@ The follow characters have to be escaped when used in normal text sections:
 Code Blocks and Latex blocks must start with a new line and end with a new line. Whitespaces at the beginning of a line cause parsing to fail
 
 Bad:
-```
-         ``````c
+~~~
+         ```c
 #include <stdio.h>
 #include <stdlib.h>
-         ``````
-```
+         ```
+~~~
 Good:
-```
-``````c
+~~~
+```c
 #include <stdio.h>
 #include <stdlib.h>
-``````
 ```
+~~~
+
 
 ##### Termination
 
