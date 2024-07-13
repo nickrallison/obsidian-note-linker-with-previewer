@@ -40,30 +40,29 @@ Since a parser is used to link your notes, it won't suggest links inside of code
 eg: "[[Vector.md|Binormal]] Vector.md|Binormal]]"
 ##### Escape Characters
 The follow characters have to be escaped when used in normal text sections:
-
-	- "*"
-
-	- ">"
-
-	- "["
-
-	- "]"
-
-	- "$"
+- "*"
+- ">"
+- "["
+- "]"
+- "$"
 
 ##### Code Blocks
 Code Blocks and Latex blocks must start with a new line and end with a new line. Whitespaces at the beginning of a line cause parsing to fail
 
 Bad:
+```
          \`\`\`c
 #include <stdio.h>
 #include <stdlib.h>
          \`\`\`
+```
 Good
+```
 \`\`\`c
 #include <stdio.h>
 #include <stdlib.h>
 \`\`\`
+```
 
 ##### Termination
 
