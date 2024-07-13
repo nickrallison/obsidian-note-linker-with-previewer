@@ -69,17 +69,17 @@ Good
 Special characters must be terminated.
 
 Good:
-This is **Important** text
+`This is **Important** text`
 
 Bad:
-This is **Important text
+`This is **Important text`
 
 Good:
-This is a [[link]] to a page
+`This is a [[link]] to a page`
 
 Bad:
-This is a [[link to a page
-This is a link]] to a page
+`This is a [[link to a page`
+`This is a link]] to a page`
 
 #### My Notes are Still Getting an Error
 
