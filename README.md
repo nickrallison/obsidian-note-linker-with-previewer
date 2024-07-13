@@ -1,4 +1,4 @@
-# Obsidian Linker Plugin
+# Obsidian Note Linker
 ## Usage
 ### Summary
 
