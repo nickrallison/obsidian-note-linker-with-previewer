@@ -2,7 +2,7 @@
 ## Usage
 ### Summary
 
-This is a plugin to find links between your notes. That's it, that's all it does.
+This is a plugin to find links between your notes.
 
 ![2024-07-12 14-31-18](https://github.com/user-attachments/assets/5c3170db-0e39-4ac1-83bb-f0a183b30478)
 
