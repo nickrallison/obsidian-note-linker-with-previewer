@@ -44,6 +44,9 @@ export default class RustPlugin extends Plugin {
 		// DO NOT REMOVE, PLUGIN DOES NOT LOAD WITHOUT IT
 		await plugin.default(Promise.resolve(buffer));
 
+		this.cache_obj = {};
+		await this.read_cache();
+
 		this.addCommand({
 			id: "link_current_file",
 			name: "Link Current Note",
@@ -82,9 +85,9 @@ export default class RustPlugin extends Plugin {
 		this.addCommand({
 			id: "reset_cache",
 			name: "Reset Cache",
-			callback: () => {
-				this.app.vault.adapter.write(this.cache_path, '{}');
+			callback: async () => {
 				this.cache_obj = {};
+				await this.write_cache();
 			}
 		});
 
@@ -238,7 +241,7 @@ export default class RustPlugin extends Plugin {
 		else {
 			console.log("Cache is invalid");
 			this.cache_obj = {};
-			await this.app.vault.adapter.write(this.cache_path, JSON.stringify(this.cache_obj));
+			await this.write_cache();
 		}
 
 		for (index = 0; index < valid_files_len; index++) {
@@ -252,7 +255,7 @@ export default class RustPlugin extends Plugin {
 			this.cache_obj[file_path]['aliases'] = alias_map[file_path]
 		}
 
-		await this.app.vault.adapter.write(this.cache_path, JSON.stringify(this.cache_obj));
+		await this.write_cache();
 	}
 
 	async get_links(tfile: TFile, link_finder: plugin.JsLinkFinder, file: plugin.JsFile): Promise<plugin.JsLink[]> {
@@ -440,8 +443,21 @@ export default class RustPlugin extends Plugin {
 			'links': remaining_links,
 			'aliases': alias_map[file_path]
 		}
+		await this.write_cache();
+	}
+	async write_cache() {
+		if (!this.app.vault.adapter.exists(this.cache_path)) {
+			await this.app.vault.adapter.write(this.cache_path, "{}");
+		}
 		await this.app.vault.adapter.write(this.cache_path, JSON.stringify(this.cache_obj));
 	}
+	async read_cache() {
+		if (!this.app.vault.adapter.exists(this.cache_path)) {
+			await this.app.vault.adapter.write(this.cache_path, "{}");
+		}
+		await this.app.vault.adapter.read(this.cache_path);
+	}
+
 }
 
 class ParseModal extends Modal {
