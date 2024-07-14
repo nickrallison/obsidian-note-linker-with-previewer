@@ -27,8 +27,8 @@ jobs:
 
       - name: Build
         run: |
-          yarn run dev || true
-          yarn run dev
+          yarn run github_actions || true
+          yarn run github_actions
 
       - name: Create Release
         id: create_release
