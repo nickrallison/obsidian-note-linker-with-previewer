@@ -37,8 +37,8 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Upload Release Asset
-        id: upload-release-asset 
+      - name: Upload Release Asset Main
+        id: upload-release-asset-main 
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
@@ -48,8 +48,8 @@ jobs:
           asset_name: main.js
           asset_content_type: application/js
 
-      - name: Upload Release Asset
-        id: upload-release-asset 
+      - name: Upload Release Asset Manifest
+        id: upload-release-asset-manifest
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.YOUR_GITHUB_TOKEN }}
