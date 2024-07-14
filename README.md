@@ -29,6 +29,7 @@ You have several commands you can use
 	- **This one is important. Read the section below**
 5. Reset Cache
 	- This is helpful if you are getting weird linking behavior, it hard resets your cache so when it searches again, it searches from scratch.
+ 	- The cache is automatically reset whenever a new title or alias is found in one of its notes and isn't in the cache. This is to ensure that it finds any notes with that new title 
 
 ### Parsing & Invalid Notes
 
