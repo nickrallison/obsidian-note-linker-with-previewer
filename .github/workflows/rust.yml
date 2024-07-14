@@ -30,9 +30,13 @@ jobs:
           yarn run github_actions || true
           yarn run github_actions
 
+      - name: Get previous release tag
+        id: previous-release
+        uses: sammcoe/get-previous-release-action@v1
+
       - name: Get next version
         id: next_version
-        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json)"
+        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previous-release.output.release }})"
 
       - name: Create Release
         id: create_release
