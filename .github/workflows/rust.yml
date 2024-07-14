@@ -20,9 +20,10 @@ jobs:
         with:
           node-version: '14'
 
-      - name: Get next version
-        id: next_version
-        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previous-release.output.release }})"
+      - name: Get previous release tag
+        id: previous-release
+        uses: sammcoe/get-previous-release-action@v1
+
 
       - name: Install dependencies
         run: |
