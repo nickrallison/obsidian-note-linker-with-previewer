@@ -10,13 +10,6 @@ fi
 # Extract the version number
 version=$(grep -P '"version": "\d+.\d+.\d+"' $manifest | grep -Po "\d+.\d+.\d+")
 
-prev_version=$2
-
-# if version == prev_version, then exit
-if [ "$version" == "$prev_version" ]; then
-  echo "Version is already $prev_version"
-  exit 1
-fi
 echo $version
 
 # # Break it down into Major.Minor.Patch

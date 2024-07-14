@@ -20,10 +20,6 @@ jobs:
         with:
           node-version: '14'
 
-      - name: 'Get Previous tag'
-        id: previoustag
-        uses: "WyriHaximus/github-action-get-previous-tag@v1"
-
       - name: Install dependencies
         run: |
           cargo install wasm-pack
@@ -34,10 +30,6 @@ jobs:
           yarn run github_actions || true
           yarn run github_actions
 
-      # - name: Get previous release tag
-      #   id: previous-release
-      #   uses: sammcoe/get-previous-release-action@v1
-
       - name: Get next version
         id: next_version
         run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previoustag.outputs.tag }})"
@@ -46,7 +38,7 @@ jobs:
         id: create_release
         uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
         with:
           tag_name: ${{ steps.next_version.outputs.version }}
           release_name: ${{ steps.next_version.outputs.version }}
@@ -57,7 +49,7 @@ jobs:
         id: upload-release-asset-main 
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./main.js
@@ -68,7 +60,7 @@ jobs:
         id: upload-release-asset-manifest
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./manifest.json
