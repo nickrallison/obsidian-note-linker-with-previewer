@@ -15,6 +15,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Get next version
+        id: next_version
+        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previoustag.outputs.tag }})"
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -41,9 +45,9 @@ jobs:
           yarn run github_actions || true
           yarn run github_actions
 
-      - name: Get next version
-        id: next_version
-        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previoustag.outputs.tag }})"
+      # - name: Get next version
+      #   id: next_version
+      #   run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previoustag.outputs.tag }})"
 
       # - name: Create Release
       #   id: create_release
