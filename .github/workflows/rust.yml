@@ -15,21 +15,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Get next version
-        id: next_version
-        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previoustag.outputs.tag }})"
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ steps.next_version.outputs.version }}
-          release_name: ${{ steps.next_version.outputs.version }}
-          draft: false
-          prerelease: false
-
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:
@@ -45,20 +30,20 @@ jobs:
           yarn run github_actions || true
           yarn run github_actions
 
-      # - name: Get next version
-      #   id: next_version
-      #   run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previoustag.outputs.tag }})"
+      - name: Get next version
+        id: next_version
+        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previoustag.outputs.tag }})"
 
-      # - name: Create Release
-      #   id: create_release
-      #   uses: actions/create-release@v1
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   with:
-      #     tag_name: ${{ steps.next_version.outputs.version }}
-      #     release_name: ${{ steps.next_version.outputs.version }}
-      #     draft: false
-      #     prerelease: false
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.next_version.outputs.version }}
+          release_name: ${{ steps.next_version.outputs.version }}
+          draft: false
+          prerelease: false
 
       - name: Upload Release Asset Main
         id: upload-release-asset-main 
