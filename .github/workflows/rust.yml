@@ -20,10 +20,9 @@ jobs:
         with:
           node-version: '14'
 
-      - name: Get previous release tag
-        id: previous-release
-        uses: sammcoe/get-previous-release-action@v1
-
+      - name: 'Get Previous tag'
+        id: previoustag
+        uses: "WyriHaximus/github-action-get-previous-tag@v1"
 
       - name: Install dependencies
         run: |
@@ -41,7 +40,7 @@ jobs:
 
       - name: Get next version
         id: next_version
-        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previous-release.output.release }})"
+        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json  ${{ steps.previoustag.outputs.tag }})"
 
       - name: Create Release
         id: create_release
