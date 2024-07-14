@@ -476,7 +476,14 @@ export default class RustPlugin extends Plugin {
     valid_files_len: number,
     perform_link: boolean,
   ) {
-    // if file is open get content from editor, otherwise get content from file
+    // file file is active file, save
+    let active_view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (active_view) {
+      if (file_path == active_view.file.path) {
+        await this.save_active_file();
+      }
+    }
+
     if (await this.validate_file(tfilemap[file_path])) {
       console.log(
         `(${valid_index} / ${valid_files_len}) up to date ` + file_path,
@@ -513,9 +520,8 @@ export default class RustPlugin extends Plugin {
       file_content = view.editor.getValue();
     }
     for (let link of file_links) {
-      let file_increment: number = 0;
-      let slice_start = file_increment + link.get_start();
-      let slice_end = file_increment + link.get_end();
+      let slice_start = byte_increament + link.get_start();
+      let slice_end = byte_increament + link.get_end();
       let source = link.get_source();
       let target = link.get_target();
 
@@ -531,6 +537,7 @@ export default class RustPlugin extends Plugin {
 
       let replaced_as_bytes = encoder.encode(replace_str);
       let increment = replaced_as_bytes.length - (slice_end - slice_start);
+
       let color = this.settings.color;
       let colored_content =
         decoder.decode(content_as_bytes.slice(0, slice_start)) +
