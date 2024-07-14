@@ -3,6 +3,10 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
+  
 
 jobs:
   build:
@@ -18,7 +22,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get install -y cargo wasm-pack
+          cargo install wasm-pack
           yarn install
 
       - name: Build
