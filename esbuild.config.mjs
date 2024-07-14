@@ -12,6 +12,7 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 const prod = (process.argv[2] === 'production');
+const watch = !(process.argv[2] === 'production') && !(process.argv[2] === 'github_actions');
 
 // load WASM files - see https://github.com/evanw/esbuild/issues/408#issuecomment-699688651
 import path from 'path';
@@ -65,7 +66,7 @@ esbuild.build({
         '@lezer/lr',
         ...builtins],
     format: 'cjs',
-    watch: !prod,
+    watch: watch,
     target: 'es2020',
     logLevel: "info",
     sourcemap: prod ? false : 'inline',
