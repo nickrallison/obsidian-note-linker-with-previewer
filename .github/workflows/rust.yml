@@ -30,6 +30,10 @@ jobs:
           yarn run github_actions || true
           yarn run github_actions
 
+      - name: Get next version
+        id: next_version
+        run: echo "::set-output name=version::$(/bin/sh ./src/scripts/next_ver.sh manifest.json)"
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
