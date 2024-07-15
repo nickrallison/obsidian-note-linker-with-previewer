@@ -50,8 +50,8 @@ interface FileChange {
 export default class RustPlugin extends Plugin {
   settings: RustPluginSettings;
   cache_path: string =
-    this.app.vault.configDir +
-    "/plugins/obsidian-note-linker-with-previewer/cache.json";
+    this.manifest.dir +
+    "/cache.json";
   cache_obj: { [key: string]: any } = {};
 
   async onload() {
@@ -319,7 +319,7 @@ export default class RustPlugin extends Plugin {
     }
 
     if (cache_valid) {
-      console.log("Cache is valid");
+      // console.log("Cache is valid");
     } else {
       console.log("Cache is invalid");
       this.cache_obj = {};
@@ -485,9 +485,9 @@ export default class RustPlugin extends Plugin {
     }
 
     if (await this.validate_file(tfilemap[file_path])) {
-      console.log(
-        `(${valid_index} / ${valid_files_len}) up to date ` + file_path,
-      );
+      // console.log(
+      //   `(${valid_index} / ${valid_files_len}) up to date ` + file_path,
+      // );
       valid_index++;
       return;
     }
@@ -498,9 +498,9 @@ export default class RustPlugin extends Plugin {
       link_finder,
       file,
     );
-    console.log(
-      `(${valid_index} / ${valid_files_len}) Found Links for ` + file_path,
-    );
+    // console.log(
+    //   `(${valid_index} / ${valid_files_len}) Found Links for ` + file_path,
+    // );
     new Notice(
       `(${valid_index} / ${valid_files_len}) Found Links for ` + file_path,
     );
@@ -563,7 +563,7 @@ export default class RustPlugin extends Plugin {
           let tfile: TFile = tfilemap[source];
           file_content = new_content;
 
-          await this.app.vault.process(tfile, () => new_content);
+          await this.app.vault.modify(tfile, new_content);
           byte_increament += increment;
         }
 

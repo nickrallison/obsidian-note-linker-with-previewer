@@ -3,7 +3,7 @@
 	"name": "Note Linker with Previewer",
 	"version": "1.0.2",
 	"minAppVersion": "0.15.0",
-	"description": "This is a note linker plugin",
+	"description": "note linker",
 	"author": "Nick Allison",
 	"authorUrl": "https://github.com/nickrallison",
 	"fundingUrl": "https://github.com/sponsors/nickrallison",
