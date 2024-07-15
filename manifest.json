@@ -3,7 +3,7 @@
 	"name": "Note Linker with Previewer",
 	"version": "1.0.3",
 	"minAppVersion": "0.15.0",
-	"description": "note linker",
+	"description": "Link your notes together",
 	"author": "Nick Allison",
 	"authorUrl": "https://github.com/nickrallison",
 	"fundingUrl": "https://github.com/sponsors/nickrallison",
