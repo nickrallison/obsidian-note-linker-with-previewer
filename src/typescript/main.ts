@@ -67,7 +67,7 @@ export default class RustPlugin extends Plugin {
 
     this.addCommand({
       id: "link_current_file",
-      name: "Link Current Note",
+      name: "Link current note",
       callback: () => {
         let active_view = this.app.workspace.getActiveViewOfType(MarkdownView);
         if (active_view) {
@@ -78,7 +78,7 @@ export default class RustPlugin extends Plugin {
 
     this.addCommand({
       id: "link_vault",
-      name: "Link Vault",
+      name: "Link vault",
       callback: () => {
         this.run_linker();
       },
@@ -86,7 +86,7 @@ export default class RustPlugin extends Plugin {
 
     this.addCommand({
       id: "scan_vault",
-      name: "Scan Vault",
+      name: "Scan vault",
       callback: () => {
         this.scan_vault();
       },
@@ -94,7 +94,7 @@ export default class RustPlugin extends Plugin {
 
     this.addCommand({
       id: "invalid_notes",
-      name: "Get Invalid Notes",
+      name: "Get invalid notes",
       callback: () => {
         this.get_invalid_notes();
       },
@@ -102,7 +102,7 @@ export default class RustPlugin extends Plugin {
 
     this.addCommand({
       id: "reset_cache",
-      name: "Reset Cache",
+      name: "Reset cache",
       callback: async () => {
         this.cache_obj = {};
         await this.write_cache();
@@ -720,7 +720,7 @@ class RustPluginSettingTab extends PluginSettingTab {
         }),
       );
     new Setting(containerEl)
-      .setName("Include Paths")
+      .setName("Include paths")
       .setDesc("Paths to include in linking, default is all files in the vault")
       .addTextArea((text) =>
         text
@@ -731,7 +731,7 @@ class RustPluginSettingTab extends PluginSettingTab {
           }),
       );
     new Setting(containerEl)
-      .setName("Exclude Paths")
+      .setName("Exclude paths")
       .setDesc("Paths to exclude in linking, default is no files in the vault")
       .addTextArea((text) =>
         text
