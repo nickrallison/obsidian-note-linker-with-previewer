@@ -321,7 +321,7 @@ export default class RustPlugin extends Plugin {
     if (cache_valid) {
       // console.log("Cache is valid");
     } else {
-      console.log("Cache is invalid");
+      // console.log("Cache is invalid");
       this.cache_obj = {};
       await this.write_cache();
     }
