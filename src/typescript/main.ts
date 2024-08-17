@@ -17,8 +17,6 @@ import * as plugin from "../../pkg/obsidian_note_linker_with_previewer.js";
 // DO NOT REMOVE, PLUGIN DOES NOT LOAD WITHOUT IT
 import rustPlugin from "../../pkg/obsidian_note_linker_with_previewer_bg.wasm";
 
-import "./modal.css";
-
 class RustPluginSettings {
   caseInsensitive: boolean;
   color: string;
