@@ -519,11 +519,50 @@ export default class RustPlugin extends Plugin {
     if (view && file_open) {
       file_content = view.editor.getValue();
     }
+
+    let current_file_text = file_content;
+    // bad_links:
+    // - Aliasing.md
+    // - Antisymmetric Relation.md
+    // get array of links: [Aliasing.md, Antisymmetric Relation.md]
+
+    let regex = /bad_links:\n(\s+- [^\n]*)+/g;
+    let bad_links = current_file_text.match(regex);
+    let captured_links: string[] = [];
+    let capture_regex = / - ([^\n]*)/g;
+    // if badlinks is found store the capture group 1 in captured_links
+    if (bad_links) {
+      for (let bad_link of bad_links) {
+        let match: RegExpExecArray | null;
+        while ((match = capture_regex.exec(bad_link))) {
+          captured_links.push(match[1]);
+        }
+      }
+    }
+
+    console.log("captured_links: ", captured_links);
+
+
+
     for (let link of file_links) {
       let slice_start = byte_increament + link.get_start();
       let slice_end = byte_increament + link.get_end();
       let source = link.get_source();
       let target = link.get_target();
+      let break_loop = false;
+      console.log("target: ", target);
+      for (let captured_link of captured_links) {
+        // if the basename of the target is in the captured links, skip
+        console.log("captured_link: ", captured_link);
+        console.log("target.endsWith(captured_link): ", target.endsWith(captured_link));
+        if (target.endsWith(captured_link)) {
+          break_loop = true;
+          break;
+        }
+      }
+      if (break_loop) {
+        continue;
+      }
 
       let encoder = new TextEncoder();
       let decoder = new TextDecoder();
