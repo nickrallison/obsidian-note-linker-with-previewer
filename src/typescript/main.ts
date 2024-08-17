@@ -542,7 +542,7 @@ export default class RustPlugin extends Plugin {
       }
     }
 
-    console.log("captured_links: ", captured_links);
+    // console.log("captured_links: ", captured_links);
 
 
 
@@ -552,11 +552,11 @@ export default class RustPlugin extends Plugin {
       let source = link.get_source();
       let target = link.get_target();
       let break_loop = false;
-      console.log("target: ", target);
+      // console.log("target: ", target);
       for (let captured_link of captured_links) {
         // if the basename of the target is in the captured links, skip
-        console.log("captured_link: ", captured_link);
-        console.log("target.endsWith(captured_link): ", target.endsWith(captured_link));
+        // console.log("captured_link: ", captured_link);
+        // console.log("target.endsWith(captured_link): ", target.endsWith(captured_link));
         if (target.endsWith(captured_link)) {
           break_loop = true;
           break;
