@@ -455,7 +455,6 @@ export default class RustPlugin extends Plugin {
     for (let file of filtered_filelist) {
       filtered_filemap[file.path] = file;
     }
-    console.log("filtered_filemap: ", filtered_filemap);
     return filtered_filemap;
   }
   async get_alias_map(filemap: {
