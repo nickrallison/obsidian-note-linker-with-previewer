@@ -398,7 +398,7 @@ export default class RustPlugin extends Plugin {
   async get_filtered_filemap(): Promise<{ [key: string]: TFile }> {
     // getting the include paths
     let includePaths: string[];
-    if (this.settings.includePaths == "") {
+    if (this.settings.includePaths == null || this.settings.includePaths == "") {
       includePaths = [];
     } else {
       includePaths = this.settings.includePaths.split("\n");
@@ -406,7 +406,7 @@ export default class RustPlugin extends Plugin {
 
     // get exclude paths
     let excludePaths: string[];
-    if (this.settings.excludePaths == "") {
+    if (this.settings.excludePaths == null || this.settings.excludePaths == "") {
       excludePaths = [];
     } else {
       excludePaths = this.settings.excludePaths.split("\n");
