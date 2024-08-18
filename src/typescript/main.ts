@@ -419,22 +419,43 @@ export default class RustPlugin extends Plugin {
 
     let filtered_filelist: TFile[] = [];
     for (let file of filelist) {
-      for (let include_path of includePaths) {
-        for (let exclude_path of excludePaths)
-          if (
-            file.path.startsWith(include_path) &&
-            !file.path.startsWith(exclude_path)
-          ) {
-            filtered_filelist.push(file);
-            break;
-          }
+      if (includePaths.length == 0) {
+        if (excludePaths.length == 0) {
+          filtered_filelist.push(file);
+        }
+        else {
+          for (let exclude_path of excludePaths)
+            if (!file.path.startsWith(exclude_path)) {
+              filtered_filelist.push(file);
+            }
+        }
       }
+      else {
+        if (excludePaths.length == 0) {
+          for (let include_path of includePaths)
+            if (file.path.startsWith(include_path)) {
+              filtered_filelist.push(file);
+            }
+        } else {
+          for (let include_path of includePaths) {
+            for (let exclude_path of excludePaths)
+              if (
+                file.path.startsWith(include_path) &&
+                !file.path.startsWith(exclude_path)
+              ) {
+                filtered_filelist.push(file);
+              }
+          }
+        }
+      }
+
     }
 
     let filtered_filemap: { [key: string]: TFile } = {};
     for (let file of filtered_filelist) {
       filtered_filemap[file.path] = file;
     }
+    console.log("filtered_filemap: ", filtered_filemap);
     return filtered_filemap;
   }
   async get_alias_map(filemap: {
