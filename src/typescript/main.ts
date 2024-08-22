@@ -637,7 +637,7 @@ export default class RustPlugin extends Plugin {
 
         let modal = new ParseModal(this, file_change);
         modal.open();
-
+        
         await modal.wait_for_submit();
 
         if (modal.all_accepted) {
