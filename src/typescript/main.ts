@@ -641,11 +641,11 @@ export default class RustPlugin extends Plugin {
         await modal.wait_for_submit();
 
         if (modal.all_accepted) {
-          console.log("all accepted");
+          // console.log("all accepted");
           accept_all[source] = true;
         }
         if (modal.all_declined) {
-          console.log("all declined");
+          // console.log("all declined");
           decline_all[source] = true;
         }
 
