@@ -562,7 +562,8 @@ export default class RustPlugin extends Plugin {
 
     // console.log("captured_links: ", captured_links);
 
-
+    let accept_all: { [key: string]: boolean } = {};
+    let decline_all: { [key: string]: boolean } = {};
 
     for (let link of file_links) {
       let slice_start = byte_increament + link.get_start();
@@ -613,10 +614,40 @@ export default class RustPlugin extends Plugin {
         colored_content: colored_content,
       };
       if (perform_link) {
+        if (accept_all[source] == undefined) {
+          accept_all[source] = false;
+        }
+        if (decline_all[source] == undefined) {
+          decline_all[source] = false;
+        }
+        if (accept_all[source]) {
+          let tfile: TFile = tfilemap[source];
+          file_content = new_content;
+
+          await this.app.vault.modify(tfile, new_content);
+          byte_increament += increment;
+          continue;
+        }
+        if (decline_all[source]) {
+          let json_link_serialized = link.serialize();
+          remaining_links.push(json_link_serialized);
+          continue;
+        }
+
+
         let modal = new ParseModal(this, file_change);
         modal.open();
 
         await modal.wait_for_submit();
+
+        if (modal.all_accepted) {
+          console.log("all accepted");
+          accept_all[source] = true;
+        }
+        if (modal.all_declined) {
+          console.log("all declined");
+          decline_all[source] = true;
+        }
 
         if (modal.accepted) {
           let tfile: TFile = tfilemap[source];
@@ -666,12 +697,17 @@ class ParseModal extends Modal {
   accepted: boolean;
   declined: boolean;
 
+  all_accepted: boolean;
+  all_declined: boolean;
+
   constructor(plugin: RustPlugin, file_change: FileChange) {
     super(plugin.app);
     this.plugin = plugin;
     this.change = file_change;
     this.accepted = false;
     this.declined = false;
+    this.all_accepted = false;
+    this.all_declined = false;
   }
 
   async onOpen() {
@@ -692,6 +728,27 @@ class ParseModal extends Modal {
         .setCta()
         .onClick(() => {
           this.close();
+          this.declined = true;
+        }),
+    );
+    new Setting(contentEl).addButton((btn) =>
+      btn
+        .setButtonText("Accept All")
+        .setCta()
+        .onClick(() => {
+          this.close();
+          this.all_accepted = true;
+          this.accepted = true;
+        }),
+    );
+
+    new Setting(contentEl).addButton((btn) =>
+      btn
+        .setButtonText("Decline All")
+        .setCta()
+        .onClick(() => {
+          this.close();
+          this.all_declined = true;
           this.declined = true;
         }),
     );
