@@ -1,7 +1,5 @@
 import {
   App,
-  Component,
-  Editor,
   MarkdownRenderer,
   MarkdownView,
   Modal,
@@ -10,7 +8,6 @@ import {
   PluginSettingTab,
   Setting,
   TFile,
-  Vault,
 } from "obsidian";
 import * as plugin from "../../pkg/obsidian_note_linker_with_previewer.js";
 
@@ -787,7 +784,6 @@ class ParseErrorModal extends Modal {
 
   async onOpen() {
     const { contentEl } = this;
-    contentEl.addClass("custom-modal");
     for (let index = 0; index < this.paths.length; index++) {
       let path = this.paths[index];
       let error = this.errors[index];
