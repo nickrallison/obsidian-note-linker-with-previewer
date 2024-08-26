@@ -45,6 +45,8 @@ jobs:
           draft: false
           prerelease: false
 
+      - run: ls -lah *
+
       - name: Upload Release Asset Main
         id: upload-release-asset-main 
         uses: actions/upload-release-asset@v1
@@ -76,4 +78,4 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./styles.css
           asset_name: styles.css
-          asset_content_type: application/css
+          asset_content_type: text/css
